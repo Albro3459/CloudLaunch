@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/VPN_Cloud_Automation/static/css/main.8d3f30b4.css",
+    "main.js": "/VPN_Cloud_Automation/static/js/main.ea5c7983.js",
+    "index.html": "/VPN_Cloud_Automation/index.html",
+    "main.8d3f30b4.css.map": "/VPN_Cloud_Automation/static/css/main.8d3f30b4.css.map",
+    "main.ea5c7983.js.map": "/VPN_Cloud_Automation/static/js/main.ea5c7983.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.8d3f30b4.css",
+    "static/js/main.ea5c7983.js"
+  ]
+}
