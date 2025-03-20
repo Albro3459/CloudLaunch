@@ -26,7 +26,7 @@ const Login: React.FC = () => {
         {/* Navbar */}
         <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
             <button 
-                onClick={() => navigate("/about")} 
+                onClick={() => navigate("/about", { replace: true })} 
                 className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute left-6"
             >
                 About
