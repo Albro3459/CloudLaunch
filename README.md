@@ -33,14 +33,7 @@
 
 #### Running React Site:
 
-cd VPN_CLOUD_AUTOMATION;
-npm install
-
-cd vpn-frontend;
-npm start
-
-cd vpn-frontend;
-npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
+See vpn-frontend folder for React README
 
 ---
 
@@ -51,6 +44,8 @@ Install the Wireguard app on your phone.
 Scan the QR code in the Wireguard app.
 
 Enable it in settings and you're done!
+
+---
 
 #### On Mac
 
