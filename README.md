@@ -2,7 +2,7 @@
 
 * Check out the quick demo here: https://youtu.be/1d3qo_34Vk4
 
-* Live at: https://albro3459.github.io/VPN_Cloud_Automation
+* Site is live at: https://albro3459.github.io/VPN_Cloud_Automation
 
   * Users are ubable to create their own accounts at the moment.
 
