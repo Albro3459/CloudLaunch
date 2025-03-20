@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { lambdaHelper } from "../helpers/lambdaHelper";
-import {token} from "../Secrets/token";
+import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+//   const [username, setUsername] = useState<string | null>(null);
+
   const [region, setRegion] = useState("");
   const [instanceName, setInstanceName] = useState("");
+  const [jwtToken, setJwtToken] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -45,26 +48,61 @@ const Home: React.FC = () => {
     setRegion('us-west-1'); // :) temporary
     
     try {
-      const response = await lambdaHelper(region, instanceName, token);
+        if (!jwtToken) {
+            console.error("Error: JWT token not found");
+        }
+        else {
+            const response = await lambdaHelper(region, instanceName, jwtToken);
 
-      setLoading(false);
+            console.log(jwtToken);
+        
+            setLoading(false);
 
-      if (!response) {
-          console.error("API call failed");
-          navigate("/Home", { replace: true });
-      }
+            if (!response) {
+                console.error("API call failed");
+                navigate("/Home", { replace: true });
+            }
 
-      const { public_ipv4: ip, client_private_key: client_private_key, server_public_key: server_public_key } = response;
+            const { public_ipv4, client_private_key, server_public_key } = response;
 
-      navigate("/Success", {
-        replace: true,
-        state: { instanceName: instanceName, region: region, ip: ip, client_private_key: client_private_key, server_public_key: server_public_key }
-      });
+            navigate("/Success", {
+                replace: true,
+                state: { instanceName: instanceName, region: region, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+            });
+        }
 
     } catch (error) {
       console.error("Error during deployment:", error);
     }
   };
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            const fetchUserData = async () => {
+                if (user) {
+                    // const email = user.email || "";
+                    // const extractedUsername = email.split("@")[0];
+                    // setUsername(extractedUsername);
+                    try {
+                        const token = await getIdToken(user);
+                        setJwtToken(token);
+                    } catch (error) {
+                        console.error("Error fetching JWT token:", error);
+                    }
+                } else {
+                    await signOut(auth);
+                    navigate("/", { replace: true });
+                }
+            };
+            fetchUserData();
+        });
+        return () => unsubscribe();
+    }, [navigate]);
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        navigate("/", { replace: true });
+    };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
@@ -78,7 +116,7 @@ const Home: React.FC = () => {
         </button>
         <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
         <button 
-          onClick={() => navigate("/")} 
+          onClick={handleLogout} 
           className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
         >
           Logout

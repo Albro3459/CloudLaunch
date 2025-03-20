@@ -2,6 +2,8 @@ import boto3
 import json
 import time
 from botocore.exceptions import ClientError
+import firebase_admin
+from firebase_admin import credentials, auth
 
 # Get secrets from AWS
 def get_secret(secret_name, region_name):
@@ -132,6 +134,21 @@ def deploy_instance(target_region, image_id, instance_name, security_group_id, s
     except ClientError as e:
         print(f"Error launching instance in {target_region}: {e}")
         return None
+    
+# Initialize Firebase Admin SDK
+def initialize_firebase(firebaseSecrets):
+    if not firebase_admin._apps:  # Ensures Firebase is initialized only once
+        cred = credentials.Certificate(firebaseSecrets)
+        firebase_admin.initialize_app(cred)
+    
+# Verify Firebase JWT Token
+def verify_firebase_token(token):
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        print("Token verification failed:", e)
+        return None
 
 def lambda_handler(event, context):
     """
@@ -139,9 +156,9 @@ def lambda_handler(event, context):
     Takes in 'region' and 'instance_name' in the event body
     Token is extracted from the 'Authorization' header
     """
-    print("Received event:", json.dumps(event))
     headers = event.get("headers", {})
-    input_token = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
+    auth_header = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
+    token = auth_header.replace("Bearer ", "")
 
     try:
         body = json.loads(event.get("body", "{}"))
@@ -159,8 +176,8 @@ def lambda_handler(event, context):
     target_region = 'us-west-1'
 
     # Validate input
-    if not target_region or not instance_name or not input_token or \
-        len(target_region) == 0 or len(instance_name) == 0 or len(input_token) == 0:
+    if not target_region or not instance_name or not token or \
+        len(target_region) == 0 or len(instance_name) == 0 or len(token) == 0:
         return {
             "statusCode": 400,
             "body": json.dumps({"error": f"Missing required parameters, {target_region}, {instance_name}"})
@@ -173,27 +190,33 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
+    firebaseSecrets = get_secret("FirebaseServiceAccount", target_region)
+    if not firebaseSecrets:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+        }
 
     vpn_image_id = secrets.get("VPN_IMAGE_ID")
     key_name = secrets.get("KEY_NAME")
     security_group_id = secrets.get("SECURITY_GROUP_ID")
     subnet_id = secrets.get("SUBNET_ID")
-    token = secrets.get("TOKEN")
     client_private_key = secrets.get("CLIENT_PRIVATE_KEY")
     server_public_key = secrets.get("SERVER_PUBLIC_KEY")
-
-    if token != input_token:
-        return {
-            "statusCode": 403,
-            "body": json.dumps({"error": "Invalid token"})
-        }
+    
+    # Verify token
+    if not firebase_admin._apps:
+        initialize_firebase(firebaseSecrets) 
+    user_data = verify_firebase_token(token)
+    if not user_data:
+        return {"statusCode": 403, "body": json.dumps({"error": "Invalid or expired token"})}
+    
 
     if not vpn_image_id or not security_group_id or not key_name:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Missing required secret values"})
         }
-
 
     # Check if Image exists
     image_id = check_image_exists(target_region, vpn_image_id)
@@ -216,7 +239,6 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "instance_name": instance_name,
             "public_ipv4": public_ip,
             "client_private_key": client_private_key,
             "server_public_key": server_public_key

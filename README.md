@@ -1,5 +1,15 @@
 # RUNNING:
 
+
+# Running React Site:
+
+cd vpn-frontend;
+npm start
+
+cd vpn-frontend;
+npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
+
+
 ## On the Server (EC2)
 
 Restart the WireGuard service:

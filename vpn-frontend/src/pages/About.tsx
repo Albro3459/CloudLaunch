@@ -1,10 +1,34 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
+import { auth, onAuthStateChanged, signOut } from "../firebase";
 
 const About: React.FC = () => {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+    const [username, setUsername] = useState<string | null>(null);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            const fetchUserData = async () => {
+                if (user) {
+                    const email = user.email || "";
+                    const extractedUsername = email.split("@")[0];
+                    setUsername(extractedUsername);
+                } else {
+                    await signOut(auth);
+                    navigate("/", { replace: true });
+                }
+            };
+            fetchUserData();
+        });
+        return () => unsubscribe();
+    }, [navigate]);
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        navigate("/", { replace: true });
+    };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
@@ -16,12 +40,14 @@ const About: React.FC = () => {
                 className="text-2xl cursor-pointer absolute left-6" 
             />
             <h1 className="text-xl font-semibold align-self-center">About</h1>
+            {username && username.length > 0 &&            
             <button 
-            onClick={() => navigate("/")} 
-            className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
+                onClick={handleLogout} 
+                className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
             >
-            Logout
+                Logout
             </button>
+            }
         </nav>
 
         {/* About Section */}

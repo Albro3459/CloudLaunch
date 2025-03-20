@@ -1,7 +1,7 @@
 export const lambdaHelper = async (region: string, instance_name: string, token: string) => {
     try {
         const myHeaders = new Headers();
-        myHeaders.append("Authorization", token);
+        myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
         const raw = JSON.stringify({

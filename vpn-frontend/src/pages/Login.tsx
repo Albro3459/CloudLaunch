@@ -1,23 +1,25 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth, signInWithEmailAndPassword } from "../firebase";
 
 const Login: React.FC = () => {
 
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-    
-        // Basic validation (add actual authentication logic later)
-        if (username === "admin" && password === "2222") {
+        try {
+            const email = username + "@example.com";
+            await signInWithEmailAndPassword(auth, email, password);
             navigate("/home", { replace: true });
-        } else {
-            alert("Invalid username or password!");
+        } catch (err) {
+            // alert("Invalid username or password!");
+            setError("Invalid email or password.");
         }
-    };
-    
+      };
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
@@ -32,11 +34,13 @@ const Login: React.FC = () => {
             <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
         </nav>
 
+        {error && <p>{error}</p>}
+
         {/* Login Form */}
         <div className="bg-white p-8 rounded-2xl shadow-lg w-96 mt-10">
             <h2 className="text-2xl font-semibold text-center mb-6">Login</h2>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleLogin}>
             <div className="mb-4">
                 <label className="block text-gray-700 font-medium mb-2">Username</label>
                 <input
