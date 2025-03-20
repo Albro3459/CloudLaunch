@@ -52,31 +52,45 @@ Enable it in settings and you're done!
 It's much better to just use the Wireguard Desktop app (as shown in the demo videos), but you can follow these steps instead:
 
 Start WireGuard manually:
+```sh
 wg-quick up wg-client
+```
 
 Check status:
+```sh
 sudo wg
+```
 
 To stop it:
+```sh
 wg-quick down wg-client
+```
 
 ---
 
 #### On the Server (EC2)
 
 Restart the WireGuard service:
+```sh
 sudo systemctl restart wg-quick@wg0
+```
 
 Enable it to start on boot:
+```sh
 sudo systemctl enable wg-quick@wg0
+```
 
 Check if it's running:
+```sh
 sudo systemctl status wg-quick@wg0
+```
 
 To see connected clients:
+```sh
 sudo wg show
+```
 
 To disable WireGuard (prevent auto-start):
+```sh
 sudo systemctl disable wg-quick@wg0
-
----
+```
