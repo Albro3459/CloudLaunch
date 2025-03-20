@@ -105,7 +105,7 @@ const Home: React.FC = () => {
     };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
       {/* Navbar */}
       <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
         <button 
@@ -124,7 +124,7 @@ const Home: React.FC = () => {
       </nav>
 
       {/* Deployment Form */}
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-96">
+      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
         <h2 className="text-2xl font-semibold text-center mb-6">Deploy VPN Instance</h2>
 
         <form onSubmit={async (e) => { await handleSubmit(e); }}>

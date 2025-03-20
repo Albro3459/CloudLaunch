@@ -70,7 +70,7 @@ const Success: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
         {/* Navbar */}
         <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
             <FontAwesomeIcon 
@@ -87,7 +87,7 @@ const Success: React.FC = () => {
             </button>
         </nav>
 
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-114 text-center">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-lg text-center">
             <h2 className="text-2xl font-semibold mb-4">Deployment Successful 🎉</h2>
             <p className="text-gray-700">
             Instance <b>{instanceName}</b> has been deployed in <b>{region}</b>.

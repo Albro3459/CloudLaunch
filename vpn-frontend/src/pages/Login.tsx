@@ -22,7 +22,7 @@ const Login: React.FC = () => {
       };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
         {/* Navbar */}
         <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
             <button 
@@ -37,7 +37,7 @@ const Login: React.FC = () => {
         {error && <p>{error}</p>}
 
         {/* Login Form */}
-        <div className="bg-white p-8 rounded-2xl shadow-lg w-96 mt-10">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-sm mt-10">
             <h2 className="text-2xl font-semibold text-center mb-6">Login</h2>
 
             <form onSubmit={handleLogin}>
