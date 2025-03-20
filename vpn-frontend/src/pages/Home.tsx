@@ -40,7 +40,6 @@ const Home: React.FC = () => {
     { name: "Melbourne", value: "ap-southeast-4" },
   ];
   
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -53,8 +52,6 @@ const Home: React.FC = () => {
         }
         else {
             const response = await lambdaHelper(region, instanceName, jwtToken);
-
-            console.log(jwtToken);
         
             setLoading(false);
 
@@ -176,7 +173,7 @@ const Home: React.FC = () => {
 
       {/* Loading Overlay (Blocks clicks and dims background) */}
       {loading && (
-        <div className="absolute top-0 left-0 w-full h-full bg-black/50 flex items-center justify-center">
+        <div className="fixed inset-0 w-full h-full bg-black/50 flex items-center justify-center z-50">
           <div className="border-t-4 border-white border-solid rounded-full w-16 h-16 animate-spin"></div>
         </div>
       )}
