@@ -1,8 +1,10 @@
 # VPN Cloud Automation:
 
+* Check out the quick demo here: https://youtu.be/1d3qo_34Vk4
+
 Live at: https://albro3459.github.io/VPN_Cloud_Automation
 
-Only my username and password work to prevent malicious use of my AWS account.
+Users are ubable to create their own accounts at the moment.
 
 ## About: 
 
