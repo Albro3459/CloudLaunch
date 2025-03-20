@@ -14,7 +14,7 @@
 
  * Generate your VPN configuration instantly, download the .conf file, or scan a QR code for easy setup on your devices—all in just a few clicks.
 
- * Secure, simple, and instant. Your personal cloud VPN, deployed on demand.
+ * Secure, simple, and instant. Your personal cloud VPN, deployed on demand with little to no setup needed.
 
 ---
 
@@ -25,6 +25,29 @@ npm start
 
 cd vpn-frontend;
 npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
+
+---
+
+#### On Phone
+
+Install the Wireguard app on your phone.
+
+Scan the QR code in the Wireguard app.
+
+Enable it in settings and you're done!
+
+#### On Mac
+
+It's much better to just use the Wireguard Desktop app (as shown in the demo videos), but you can follow these steps instead:
+
+Start WireGuard manually:
+wg-quick up wg-client
+
+Check status:
+sudo wg
+
+To stop it:
+wg-quick down wg-client
 
 ---
 
@@ -46,14 +69,3 @@ To disable WireGuard (prevent auto-start):
 sudo systemctl disable wg-quick@wg0
 
 ---
-
-#### On Mac
-
-Start WireGuard manually:
-wg-quick up wg-client
-
-Check status:
-sudo wg
-
-To stop it:
-wg-quick down wg-client
