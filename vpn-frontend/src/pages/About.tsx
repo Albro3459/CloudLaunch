@@ -15,9 +15,6 @@ const About: React.FC = () => {
                     const email = user.email || "";
                     const extractedUsername = email.split("@")[0];
                     setUsername(extractedUsername);
-                } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
                 }
             };
             fetchUserData();
