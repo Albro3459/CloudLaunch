@@ -17,6 +17,17 @@
  * Secure, simple, and instant. Your personal cloud VPN, deployed on demand with little to no setup needed.
 
 ---
+ 
+## Languages and Frameworks:
+   * React with TypeScript and TailwindCSS for the Frontend
+   * Python for the AWS Lambda script
+   * Firebase for Authentication
+   * AWS tools used:
+     * EC2, AMI, Lambda, VPC (amd Subnet), Secrets Manager, IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
+     * A large amount of the work was done on AWS and with the AWS CLI
+       * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: brodsky.alex22@gmail.com
+      
+---
 
 #### Running React Site:
 
