@@ -1,7 +1,22 @@
-# RUNNING:
+# VPN Cloud Automation:
 
+Live at: https://albro3459.github.io/VPN_Cloud_Automation
 
-# Running React Site:
+Only my username and password work to prevent malicious use of my AWS account.
+
+## About: 
+
+ * Instantly deploy a secure WireGuard VPN on an AWS EC2 instance in the region of your choice, pre-configured for both IPv4 and IPv6 connectivity.
+
+ * The entire deployment process is automated using AWS Lambda, ensuring a fast, efficient, and hassle-free setup.
+
+ * Generate your VPN configuration instantly, download the .conf file, or scan a QR code for easy setup on your devices—all in just a few clicks.
+
+ * Secure, simple, and instant. Your personal cloud VPN, deployed on demand.
+
+---
+
+#### Running React Site:
 
 cd vpn-frontend;
 npm start
@@ -9,8 +24,9 @@ npm start
 cd vpn-frontend;
 npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
 
+---
 
-## On the Server (EC2)
+#### On the Server (EC2)
 
 Restart the WireGuard service:
 sudo systemctl restart wg-quick@wg0
@@ -29,7 +45,7 @@ sudo systemctl disable wg-quick@wg0
 
 ---
 
-## On Mac
+#### On Mac
 
 Start WireGuard manually:
 wg-quick up wg-client
