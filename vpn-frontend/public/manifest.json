@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "VPN Deployer",
+  "name": "AWS WireGuard VPN Automated Deployer",
   "icons": [
     {
       "src": "favicon.ico",
