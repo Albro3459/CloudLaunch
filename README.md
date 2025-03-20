@@ -4,7 +4,9 @@
 
 * Site is live at: https://albro3459.github.io/VPN_Cloud_Automation
 
-  * Users are ubable to create their own accounts at the moment.
+  * Only the admin account is active for the time being.
+
+  * To save the config file or scan the QR code, on either the phone or computer, you need the Wireguard app because the VPN uses the Wireguard protocol.
 
 ## About: 
 
@@ -30,6 +32,9 @@
 ---
 
 #### Running React Site:
+
+cd VPN_CLOUD_AUTOMATION;
+npm install
 
 cd vpn-frontend;
 npm start

@@ -1,4 +1,9 @@
 **/Secrets/*
+
+**/output.css
+
+package-lock.json
+
 node_modules
 .DS_STORE
 .vscode
