@@ -179,7 +179,7 @@ def lambda_handler(event, context):
     security_group_id = secrets.get("SECURITY_GROUP_ID")
     subnet_id = secrets.get("SUBNET_ID")
     token = secrets.get("TOKEN")
-    client_public_key = secrets.get("CLIENT_PRIVATE_KEY")
+    client_private_key = secrets.get("CLIENT_PRIVATE_KEY")
     server_public_key = secrets.get("SERVER_PUBLIC_KEY")
 
     if token != input_token:
@@ -218,7 +218,7 @@ def lambda_handler(event, context):
         "body": json.dumps({
             "instance_name": instance_name,
             "public_ipv4": public_ip,
-            "client_public_key": client_public_key,
+            "client_private_key": client_private_key,
             "server_public_key": server_public_key
         })
     }

@@ -13,7 +13,7 @@ const Success: React.FC = () => {
     instanceName = "instanceName", 
     region = "region", 
     ip = "0.0.0.0",
-    client_public_key = "client_public_key", 
+    client_private_key = "client_private_key", 
     server_public_key = "server_public_key"
   } = location.state || {};
   
@@ -21,8 +21,8 @@ const Success: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (client_public_key && server_public_key && ip) {
-      const config = generateConfig(client_public_key, server_public_key, ip);
+    if (client_private_key && server_public_key && ip) {
+      const config = generateConfig(client_private_key, server_public_key, ip);
       setConfigData(config);
     }
   }, [instanceName, ip]);
@@ -47,15 +47,19 @@ const Success: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       {/* Navbar */}
-      <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-between items-center px-6">
-        <FontAwesomeIcon icon={faHouse} className="text-2xl cursor-pointer" onClick={() => navigate("/home")}/>
-        <h1 className="text-xl font-semibold">VPN Deployment</h1>
-        <button 
+      <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
+          <FontAwesomeIcon 
+              icon={faHouse} 
+              onClick={() => navigate("/home")}
+              className="text-2xl cursor-pointer absolute left-6" 
+          />
+          <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
+          <button 
           onClick={() => navigate("/")} 
-          className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition"
-        >
+          className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
+          >
           Logout
-        </button>
+          </button>
       </nav>
 
       <div className="bg-white p-8 rounded-2xl shadow-lg w-114 text-center">
