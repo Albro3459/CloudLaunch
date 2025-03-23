@@ -7,18 +7,26 @@ import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { saveAs } from "file-saver";
 import { auth, onAuthStateChanged, signOut } from "../firebase";
 
+interface SuccessState {
+    instanceName: string | null;
+    region: string | null;
+    ip: string | null;
+    client_private_key: string | null;
+    server_public_key: string | null;
+  }
+
 const Success: React.FC = () => {
     const navigate = useNavigate();
     // const [username, setUsername] = useState<string | null>(null);
 
     const location = useLocation();
     const { 
-        instanceName = "instanceName", 
-        region = "region", 
-        ip = "0.0.0.0",
-        client_private_key = "client_private_key", 
-        server_public_key = "server_public_key"
-    } = location.state || {};
+        instanceName,
+        region,
+        ip,
+        client_private_key, 
+        server_public_key
+    } = (location || {}) as Partial<SuccessState>;
     
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -71,40 +79,54 @@ const Success: React.FC = () => {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
-        {/* Navbar */}
-        <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
-            <FontAwesomeIcon 
-                icon={faHouse} 
-                onClick={() => navigate("/home")}
-                className="text-2xl cursor-pointer absolute left-6" 
-            />
-            <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
-            <button 
-            onClick={handleLogout} 
-            className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
-            >
-            Logout
-            </button>
-        </nav>
+            {/* Navbar */}
+            <nav className="w-full bg-blue-600 text-white p-4 shadow-md fixed top-0 left-0 flex justify-center items-center px-6">
+                <FontAwesomeIcon 
+                    icon={faHouse} 
+                    onClick={() => navigate("/home")}
+                    className="text-2xl cursor-pointer absolute left-6" 
+                />
+                <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
+                <button 
+                onClick={handleLogout} 
+                className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
+                >
+                Logout
+                </button>
+            </nav>
 
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-lg text-center">
-            <h2 className="text-2xl font-semibold mb-4">Deployment Successful 🎉</h2>
-            <p className="text-gray-700">
-            Instance <b>{instanceName}</b> has been deployed in <b>{region}</b>.
-            </p>
-            <p className="pt-1 text-gray-700">IP Address: <b>{ip}</b></p>
+            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-lg text-center">
+                <h2 className="text-2xl font-semibold mb-4">Deployment  {ip && ip.length > 0 ? "Successful 🎉" : "Failure ❌"}</h2>
 
-            {/* QR Code Canvas */}
-            <canvas ref={canvasRef} className="mt-4 mx-auto"></canvas>
+                {ip && ip.length > 0 ? (
+                    <p className="text-gray-700">
+                    Instance{" "}
+                    {instanceName && instanceName.length > 0 && <b>{instanceName}</b>} has been deployed in <b>{region}</b>.
+                    </p>
+                ) : (
+                    <p className="text-gray-700">No instance was deployed.</p>
+                )}
 
-            {/* Download Config Button */}
-            <button 
-            onClick={handleDownload} 
-            className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition mt-6"
-            >
-            Download Config
-            </button>
-        </div>
+                {ip && ip.length > 0 && (
+                    <p className="pt-1 text-gray-700">
+                    IP Address: <b>{ip}</b>
+                    </p>
+                )}
+
+                {/* QR Code Canvas */}
+                {ip && ip.length > 0 && (
+                    <>
+                    <canvas ref={canvasRef} className="mt-4 mx-auto"></canvas>
+                    <button 
+                        onClick={handleDownload} 
+                        className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition mt-6"
+                    >
+                        Download Config
+                    </button>
+                    </>
+                )}
+                </div>
+
         </div>
     );
 };

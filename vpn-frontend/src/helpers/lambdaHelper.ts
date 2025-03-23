@@ -1,4 +1,4 @@
-export const lambdaHelper = async (region: string, instance_name: string, token: string) => {
+export const lambdaHelper = async (region: string, token: string, instance_name = "vpn") => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
