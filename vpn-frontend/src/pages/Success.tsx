@@ -32,6 +32,7 @@ const Success: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
+        console.log(ip);
         if (client_private_key && server_public_key && ip) {
         const config = generateConfig(client_private_key, server_public_key, ip);
         setConfigData(config);
@@ -50,17 +51,17 @@ const Success: React.FC = () => {
 
     const handleDownload = () => {
         if (configData) {
-        const blob = new Blob([configData], { type: "text/plain;charset=utf-8" });
-        saveAs(blob, `wg-${instanceName}.conf`);
+            const blob = new Blob([configData], { type: "text/plain;charset=utf-8" });
+            saveAs(blob, `wg-${instanceName || "VPN"}.conf`);
         }
     };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
-                console.log(instanceName);
-                console.log(region);
-                console.log(ip);
+                // console.log(instanceName);
+                // console.log(region);
+                // console.log(ip);
                 if (user) {
                     // const email = user.email || "";
                     // const extractedUsername = email.split("@")[0];

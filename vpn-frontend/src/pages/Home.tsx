@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { lambdaHelper } from "../helpers/lambdaHelper";
+import { getUserRole, lambdaHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
 import { live_regions } from "../helpers/live_regions";
 
@@ -10,6 +10,7 @@ const Home: React.FC = () => {
 
   const [region, setRegion] = useState("");
   // const [instanceName, setInstanceName] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const [jwtToken, setJwtToken] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -36,6 +37,7 @@ const Home: React.FC = () => {
             }
 
             const { public_ipv4, client_private_key, server_public_key } = response.data;
+            console.log(public_ipv4);
 
             navigate("/Success", {
                 replace: true,
@@ -48,33 +50,40 @@ const Home: React.FC = () => {
     }
   };
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            const fetchUserData = async () => {
-                if (user) {
-                    // const email = user.email || "";
-                    // const extractedUsername = email.split("@")[0];
-                    // setUsername(extractedUsername);
-                    try {
-                        const token = await getIdToken(user);
-                        setJwtToken(token);
-                    } catch (error) {
-                        console.error("Error fetching JWT token:", error);
-                    }
-                } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
-                }
-            };
-            fetchUserData();
-        });
-        return () => unsubscribe();
-    }, [navigate]);
+  
+  const handleCreateNewAccount = () => {
+    navigate("/CreateUser", { replace: true });
+  }
 
-    const handleLogout = async () => {
-        await signOut(auth);
-        navigate("/", { replace: true });
-    };
+
+  useEffect(() => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+          const fetchUserData = async () => {
+              if (user) {
+                  // const email = user.email || "";
+                  // const extractedUsername = email.split("@")[0];
+                  // setUsername(extractedUsername);
+                  setRole(await getUserRole(user));
+                  try {
+                      const token = await getIdToken(user);
+                      setJwtToken(token);
+                  } catch (error) {
+                      console.error("Error fetching JWT token:", error);
+                  }
+              } else {
+                  await signOut(auth);
+                  navigate("/", { replace: true });
+              }
+          };
+          fetchUserData();
+      });
+      return () => unsubscribe();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+      await signOut(auth);
+      navigate("/", { replace: true });
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -160,6 +169,18 @@ const Home: React.FC = () => {
           </button>
         </form>
       </div>
+
+      { /* ADMIN ONLY: Make test account */ }
+      {role && role === "admin" &&
+        <div className="pt-4">
+          <button 
+              onClick={handleCreateNewAccount} 
+              className={"w-full p-3 rounded-lg transition cursor-pointer bg-blue-600 text-white hover:bg-blue-700"}
+              >
+                Create Test Account
+          </button>
+        </div>
+      }
 
       {/* Loading Overlay (Blocks clicks and dims background) */}
       {loading && (

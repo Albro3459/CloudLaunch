@@ -6,13 +6,15 @@ from role_manager import get_max_count_for_role, get_user_vpn_count, increment_u
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 
-dynamodb = boto3.resource("dynamodb")
-user_table = dynamodb.Table("vpn-users")
-role_table = dynamodb.Table("vpn-roles")
+CLEANUP_VPNS = True
 
 LIVE_REGIONS = [
     {"name": "California", "value": "us-west-1"}
 ]
+
+dynamodb = boto3.resource("dynamodb")
+user_table = dynamodb.Table("vpn-users")
+role_table = dynamodb.Table("vpn-roles")
 
 def lambda_handler(event, context):
     """
@@ -56,7 +58,7 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
-    firebaseSecrets = get_secret("FirebaseServiceAccount", target_region)
+    firebaseSecrets = get_secret("FirebaseServiceAccount", "us-west-1")
     if not firebaseSecrets:
         return {
             "statusCode": 500,
@@ -102,7 +104,8 @@ def lambda_handler(event, context):
         }
         
     # Clean Up up other instances:
-    shutdown_all_other_instances(LIVE_REGIONS)
+    if CLEANUP_VPNS:
+        shutdown_all_other_instances(LIVE_REGIONS)
 
     # Deploy the EC2 instance
     instance_id, public_ip  = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)

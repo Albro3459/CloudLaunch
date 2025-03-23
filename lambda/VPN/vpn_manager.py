@@ -100,10 +100,7 @@ def deploy_instance(target_region, image_id, instance_name, security_group_id, s
                 public_ip = instance.get("PublicIpAddress")
                 if public_ip:
                     print(f"Instance {instance_id} has public IP: {public_ip}")
-                    return {
-                        "instance_id": instance_id,
-                        "public_ip": public_ip
-                    }
+                    return instance_id, public_ip
             print("Waiting for public IP assignment...")
             time.sleep(interval)
         
