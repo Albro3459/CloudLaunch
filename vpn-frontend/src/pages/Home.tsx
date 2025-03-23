@@ -12,6 +12,7 @@ const Home: React.FC = () => {
   const [jwtToken, setJwtToken] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const awsRegions = [
     { name: "Virginia", value: "us-east-1" },
@@ -55,12 +56,12 @@ const Home: React.FC = () => {
         
             setLoading(false);
 
-            if (!response) {
-                console.error("API call failed");
+            if (!response.success) {
+                setErrorMessage(response.error || "Something went wrong");
                 return;
             }
 
-            const { public_ipv4, client_private_key, server_public_key } = response;
+            const { public_ipv4, client_private_key, server_public_key } = response.data;
 
             navigate("/Success", {
                 replace: true,
@@ -119,6 +120,19 @@ const Home: React.FC = () => {
           Logout
         </button>
       </nav>
+      {errorMessage && (
+        <div className="fixed top-20 w-full flex justify-center z-50">
+          <div className="bg-red-500 text-white px-6 py-3 rounded-xl shadow-md w-full max-w-md flex justify-between items-center">
+            <span className="text-sm">{errorMessage}</span>
+            <button
+              className="ml-4 font-bold hover:text-gray-200 transition"
+              onClick={() => setErrorMessage(null)}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Deployment Form */}
       <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">

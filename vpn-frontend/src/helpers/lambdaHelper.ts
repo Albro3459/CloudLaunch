@@ -17,15 +17,25 @@ export const lambdaHelper = async (region: string, instance_name: string, token:
         };
 
         const response = await fetch("https://gnzna5q2py67vtegyh2vjijnse0etwja.lambda-url.us-west-1.on.aws/", requestOptions);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
         const result = await response.json();
-        return result;
+
+        if (!response.ok) {
+            return {
+                success: false,
+                error: result?.error || `Error ${response.status}`
+            };
+        }
+
+        return {
+            success: true,
+            data: result
+        };
         
     } catch (error) {
         console.error("Lambda API Error:", error);
-        return null;
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error"
+        };
     }
 };
