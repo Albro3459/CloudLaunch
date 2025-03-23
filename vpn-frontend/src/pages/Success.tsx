@@ -32,7 +32,7 @@ const Success: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        console.log(ip);
+        // console.log(ip);
         if (client_private_key && server_public_key && ip) {
         const config = generateConfig(client_private_key, server_public_key, ip);
         setConfigData(config);
@@ -90,7 +90,7 @@ const Success: React.FC = () => {
                     onClick={() => navigate("/home")}
                     className="text-2xl cursor-pointer absolute left-6" 
                 />
-                <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
+                <h1 className="text-xl font-semibold align-self-center">Success</h1>
                 <button 
                 onClick={handleLogout} 
                 className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"

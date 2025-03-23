@@ -8,6 +8,9 @@ def create_user(email, password):
     try:
         user = auth.create_user(email=email, password=password)
         return user.uid
+    except auth.EmailAlreadyExistsError as e:
+        print("Error: User already exists:", e)
+        return auth.EmailAlreadyExistsError
     except Exception as e:
         print("Error creating user:", e)
         return None
@@ -71,10 +74,12 @@ def lambda_handler(event, context):
     
     uuid = create_user(email, password)
     if not uuid:
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user: {uuid}"})}
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user: {email.split('@')[0]}"})}
     success = create_role(uuid)
     if not success:
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user: {uuid}"})}
+        if uuid == auth.EmailAlreadyExistsError:
+            return {"statusCode": 403, "body": json.dumps({"error": f"Error: Account already exists for user: {email.split('@')[0]}"})}
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user: {email.split('@')[0]}"})}
 
     return {
         "statusCode": 200,

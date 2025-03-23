@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth, signInWithEmailAndPassword } from "../firebase";
+import { auth, onAuthStateChanged, signInWithEmailAndPassword } from "../firebase";
 
 const Login: React.FC = () => {
 
@@ -19,7 +19,19 @@ const Login: React.FC = () => {
             // alert("Invalid username or password!");
             setError("Invalid email or password.");
         }
-      };
+    };
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            const fetchUserData = async () => {
+                if (user) {
+                    navigate("/home", { replace: true });
+                }
+            };
+            fetchUserData();
+        });
+        return () => unsubscribe();
+    }, [navigate]);
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">

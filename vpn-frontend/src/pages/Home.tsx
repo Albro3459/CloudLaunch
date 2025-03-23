@@ -37,7 +37,6 @@ const Home: React.FC = () => {
             }
 
             const { public_ipv4, client_private_key, server_public_key } = response.data;
-            console.log(public_ipv4);
 
             navigate("/Success", {
                 replace: true,

@@ -28,10 +28,10 @@ export const lambdaHelper = async (region: string, token: string, instance_name 
                 error: result?.error || `Error ${response.status}`
             };
         }
-        
+
         return {
             success: true,
-            data: result
+            data: result.data
         };
         
     } catch (error) {
@@ -74,7 +74,7 @@ export const createUser = async (username: string, password: string, token: stri
 
         return {
             success: true,
-            data: result
+            data: result.uuid_created
         };
         
     } catch (error) {
