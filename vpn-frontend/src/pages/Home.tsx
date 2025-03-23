@@ -57,7 +57,7 @@ const Home: React.FC = () => {
 
             if (!response) {
                 console.error("API call failed");
-                navigate("/Home", { replace: true });
+                return;
             }
 
             const { public_ipv4, client_private_key, server_public_key } = response;
