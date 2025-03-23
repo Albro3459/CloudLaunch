@@ -26,7 +26,7 @@ const Success: React.FC = () => {
         ip,
         client_private_key, 
         server_public_key
-    } = (location || {}) as Partial<SuccessState>;
+    } = (location.state || {}) as Partial<SuccessState>;
     
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -58,6 +58,9 @@ const Success: React.FC = () => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
+                console.log(instanceName);
+                console.log(region);
+                console.log(ip);
                 if (user) {
                     // const email = user.email || "";
                     // const extractedUsername = email.split("@")[0];

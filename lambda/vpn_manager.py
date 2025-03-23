@@ -22,11 +22,11 @@ def get_available_instance_name(ec2, instance_name):
                     existing_names.add(tag["Value"])
 
     # Try base name first
-    if instance_name not in existing_names:
+    if instance_name not in existing_names and instance_name != "VPN":
         return instance_name
 
-    # Try appending -1 to -15
-    for i in range(1, 16):
+    # Try appending -1 to -50
+    for i in range(1, 50):
         new_name = f"{instance_name}-{i}"
         if new_name not in existing_names:
             return new_name
@@ -100,7 +100,10 @@ def deploy_instance(target_region, image_id, instance_name, security_group_id, s
                 public_ip = instance.get("PublicIpAddress")
                 if public_ip:
                     print(f"Instance {instance_id} has public IP: {public_ip}")
-                    return public_ip
+                    return {
+                        "instance_id": instance_id,
+                        "public_ip": public_ip
+                    }
             print("Waiting for public IP assignment...")
             time.sleep(interval)
         
@@ -109,4 +112,28 @@ def deploy_instance(target_region, image_id, instance_name, security_group_id, s
         
     except ClientError as e:
         print(f"Error launching instance in {target_region}: {e}")
-        return None
+        return None    
+    
+def shutdown_all_other_instances(LIVE_REGIONS):
+    for region in [r["value"] for r in LIVE_REGIONS]:
+        ec2 = boto3.resource("ec2", region_name=region)
+        print(f"Checking region: {region}")
+        terminate_old_vpn_instances(ec2)
+    
+    
+def terminate_old_vpn_instances(ec2):
+    filters = [
+        {"Name": "instance-state-name", "Values": ["running", "pending"]},
+        {"Name": "tag:Name", "Values": ["VPN-*"]}  # Or whatever your VPN tag pattern is
+    ]
+
+    instances_to_terminate = []
+    for instance in ec2.instances.filter(Filters=filters):
+        print(f"Marking for termination: {instance.id} ({instance.public_ip_address})")
+        instances_to_terminate.append(instance.id)
+
+    if instances_to_terminate:
+        ec2.instances.filter(InstanceIds=instances_to_terminate).terminate()
+        print(f"Terminated instances: {instances_to_terminate}")
+    else:
+        print("No other instances to terminate.")

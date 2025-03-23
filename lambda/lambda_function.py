@@ -1,7 +1,7 @@
 import json
 import boto3
 
-from vpn_manager import check_image_exists, deploy_instance
+from vpn_manager import check_image_exists, deploy_instance, shutdown_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
@@ -9,6 +9,10 @@ from get_secrets import get_secret
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
 role_table = dynamodb.Table("vpn-roles")
+
+LIVE_REGIONS = [
+    {"name": "California", "value": "us-west-1"}
+]
 
 def lambda_handler(event, context):
     """
@@ -36,11 +40,13 @@ def lambda_handler(event, context):
     target_region = 'us-west-1'
 
     # Validate input
-    if not target_region or not instance_name or not token or \
-        len(target_region) == 0 or len(instance_name) == 0 or len(token) == 0:
+    if not instance_name or len(instance_name) == 0:
+        instance_name = "VPN"
+    if not target_region or not token or \
+        len(target_region) == 0 or len(token) == 0:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters, {target_region}, {instance_name}"})
+            "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
         }
 
     # Fetch secrets
@@ -94,14 +100,22 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": image_id})
         }
+        
+    # Clean Up up other instances:
+    shutdown_all_other_instances(LIVE_REGIONS)
 
     # Deploy the EC2 instance
-    public_ip = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
+    instance_id, public_ip  = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
 
     if not public_ip:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve instance public IP"})
+        }
+    if not instance_id:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Failed to retrieve instance ID"})
         }
 
     return {
