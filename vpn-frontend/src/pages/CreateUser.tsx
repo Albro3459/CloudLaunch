@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getIdToken, onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import { createUser, getUserRole } from "../helpers/APIHelper";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHouse } from "@fortawesome/free-solid-svg-icons";
+import { createUser, getUserRole } from "../helpers/usersHelper";
 
 const CreateUser: React.FC = () => {
     const navigate = useNavigate();

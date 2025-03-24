@@ -31,3 +31,15 @@ def get_user_role(uid):
     except Exception as e:
         print("Error fetching role:", e)
         return None
+
+# Get the live regions from Firestore
+def get_live_regions():
+    try:
+        db = firestore.client()
+        docs = db.collection("Live-Regions").stream()
+        regions = [{"name": doc.to_dict().get("name"), "value": doc.id} for doc in docs]
+        regions.sort(key=lambda r: r["name"].lower())
+        return regions
+    except Exception as e:
+        print(f"Error fetching live regions from Firestore: {e}")
+        return []

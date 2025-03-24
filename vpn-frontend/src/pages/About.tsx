@@ -49,7 +49,31 @@ const About: React.FC = () => {
     
             {/* About Section */}
             <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-xl text-center mx-4">
-                <h2 className="text-2xl font-semibold mb-4">What is VPN Cloud Automation?</h2>
+                <h2 className="text-2xl font-semibold mb-2">What is VPN Cloud Automation?</h2>
+                <div className="ps-2 text-sm mb-2">
+                    <b>Created by: </b>Alex Brodsky 
+                    <br></br>
+                    <a
+                        href="https://github.com/Albro3459/VPN_Cloud_Automation/tree/main"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                        >
+                        GitHub
+                    </a>
+                    <span> |   </span>
+                    <a
+                        href="https://www.linkedin.com/in/brodsky-alex22/"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                        >
+                        LinkedIn
+                    </a>
+                    <span> |   </span>
+                    <a
+                        href="mailto:Brodsky.Alex22@gmail.com"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                        >
+                        Email
+                    </a>
+                </div>
                 <p className="text-gray-700 mb-4">
                     Instantly deploy a secure <b>WireGuard VPN</b> on an AWS EC2 instance in the region of your choice, 
                     pre-configured for both IPv4 and IPv6 connectivity.

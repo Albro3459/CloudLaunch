@@ -3,15 +3,10 @@ import boto3
 
 from vpn_manager import check_image_exists, deploy_instance, shutdown_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
-from firebase import initialize_firebase, verify_firebase_token, get_user_role
+from firebase import get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 
 CLEANUP_VPNS = True
-
-LIVE_REGIONS = [
-    {"name": "California", "value": "us-west-1"},
-    {"name": "Japan", "value": "ap-northeast-1"}
-]
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -48,11 +43,6 @@ def lambda_handler(event, context):
             "statusCode": 400,
             "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
         }
-    if target_region not in [r["value"] for r in LIVE_REGIONS]:
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": "Target region is not live"})
-        }
 
     # Fetch secrets
     if target_region == "us-west-1":
@@ -79,13 +69,20 @@ def lambda_handler(event, context):
     server_public_key = secrets.get("SERVER_PUBLIC_KEY")
     
     # Verify token
-    initialize_firebase(firebaseSecrets) 
+    initialize_firebase(firebaseSecrets)
     user_id = verify_firebase_token(token)
     if not user_id:
         return {"statusCode": 403, "body": json.dumps({"error": "Invalid or expired token"})}
     role = get_user_role(user_id)
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
+    initialize_firebase(firebaseSecrets) 
+    live_regions = get_live_regions()
+    if target_region not in [r["value"] for r in live_regions]:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Target region is not live"})
+        }
     
     # Check if the user can make more VPNs
     user_vpn_count = get_user_vpn_count(user_id, user_table)
@@ -110,7 +107,7 @@ def lambda_handler(event, context):
         
     # Clean Up up other instances:
     if CLEANUP_VPNS:
-        shutdown_all_other_instances(LIVE_REGIONS)
+        shutdown_all_other_instances(live_regions)
 
     # Deploy the EC2 instance
     result = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)

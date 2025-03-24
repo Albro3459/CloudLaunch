@@ -32,7 +32,7 @@ def check_if_ami_exists(ec2, base_name, max_attempts=50):
 
 def copy_image(target_region, source_vpn_image_id):
     ec2 = boto3.client("ec2", region_name=target_region)
-    ami_name = f"{target_region}-VPN-image-EC2"
+    ami_name = f"{target_region}-VPN-image-EC2-v2"
     
     existing_image_id = check_if_ami_exists(ec2, ami_name)
     if existing_image_id != "":
