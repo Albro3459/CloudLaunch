@@ -10,33 +10,6 @@ from firebase import initialize_firebase, is_region_live, update_live_regions, v
 
 SOURCE_REGION = "us-west-1"
 
-REGION_NAME_MAP = {
-    "us-east-1": "Virginia",
-    "us-east-2": "Ohio",
-    "us-west-1": "California",
-    "us-west-2": "Oregon",
-    "ap-southeast-4": "Australia (Melbourne)",
-    "ap-southeast-2": "Australia (Sydney)",
-    "sa-east-1": "Brazil",
-    "ca-central-1": "Canada",
-    "eu-west-3": "France",
-    "eu-central-1": "Germany",
-    "ap-east-1": "Hong Kong",
-    "ap-south-2": "India (Hyderabad)",
-    "ap-south-1": "India (Mumbai)",
-    "ap-southeast-3": "Indonesia",
-    "eu-west-1": "Ireland",
-    "ap-northeast-3": "Japan (Osaka)",
-    "ap-northeast-1": "Japan (Tokyo)",
-    "ap-southeast-1": "Singapore",
-    "af-south-1": "South Africa",
-    "ap-northeast-2": "South Korea",
-    "eu-south-1": "Spain",
-    "eu-north-1": "Sweden",
-    "me-central-1": "United Arab Emirates",
-    "eu-west-2": "United Kingdom",
-}
-
 # Waits until AMI is live and sets the region to live in Firebase
 
 def check_for_image(ami_id, region, timeout=600, poll_interval=15):
