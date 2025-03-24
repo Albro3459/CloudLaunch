@@ -26,7 +26,7 @@
 ## Languages and Frameworks:
    * React with TypeScript and TailwindCSS for the Frontend
    * Python for the AWS Lambda script
-   * Firebase for Authentication
+   * Firebase for Authentication and Database
    * AWS tools used:
      * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
      * A large amount of the work was done on AWS and with the AWS CLI
