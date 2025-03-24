@@ -1,12 +1,15 @@
 # VPN Cloud Automation:
 
-* Check out the quick demo here: [https://youtu.be/1d3qo_34Vk4](https://youtu.be/Zpeojm-HI8g)
+* Check out the quick demo on [YouTube](https://youtu.be/Zpeojm-HI8g)
 
-* Site is live at: [https://albro3459.github.io/VPN_Cloud_Automation](https://albro3459.github.io/VPN_Cloud_Automation)
+* The website is live at: [https://albro3459.github.io/VPN_Cloud_Automation](https://albro3459.github.io/VPN_Cloud_Automation)
 
   * Only the admin account is active for the time being.
+ 
+  * [Email me](mailto:brodsky.alex22@gmail.com) or message me on [LinkedIn](https://www.linkedin.com/in/brodsky-alex22/) if you want to try it.
 
   * To save the config file or scan the QR code, on either the phone or computer, you need the Wireguard app because the VPN uses the Wireguard protocol.
+    * Desktop: [wireguard.com](https://www.wireguard.com/install/) or for iPhone: [AppStore](https://apps.apple.com/us/app/wireguard/id1441195209)
 
 ## About: 
 
@@ -27,7 +30,7 @@
    * AWS tools used:
      * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
      * A large amount of the work was done on AWS and with the AWS CLI
-       * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: brodsky.alex22@gmail.com
+       * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: [brodsky.alex22@gmail.com](brodsky.alex22@gmail.com)
       
 ---
 
