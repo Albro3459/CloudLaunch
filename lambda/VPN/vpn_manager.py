@@ -50,7 +50,7 @@ def check_image_exists(target_region, image_id):
             return imageID
             
         print(f"Image ID {image_id} does not exist in {target_region}.")
-        return f"Does not exist in region {target_region}"
+        return f"Image does not exist in region {target_region}"
 
     except ClientError as e:
         print(f"Error checking Image in {target_region}: {e}")
@@ -108,8 +108,14 @@ def deploy_instance(target_region, image_id, instance_name, security_group_id, s
         return None
         
     except ClientError as e:
-        print(f"Error launching instance in {target_region}: {e}")
-        return None    
+        print(f"AWS ClientError: {e}")
+        return None
+    except BotoCoreError as e:
+        print(f"AWS Core Error: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error launching instance: {e}")
+        return None
     
 def shutdown_all_other_instances(LIVE_REGIONS):
     for region in [r["value"] for r in LIVE_REGIONS]:
@@ -121,7 +127,7 @@ def shutdown_all_other_instances(LIVE_REGIONS):
 def terminate_old_vpn_instances(ec2):
     filters = [
         {"Name": "instance-state-name", "Values": ["running", "pending"]},
-        {"Name": "tag:Name", "Values": ["VPN-*"]}  # Or whatever your VPN tag pattern is
+        {"Name": "tag:Name", "Values": ["VPN-*"]}
     ]
 
     instances_to_terminate = []

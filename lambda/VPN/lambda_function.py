@@ -9,7 +9,8 @@ from get_secrets import get_secret
 CLEANUP_VPNS = True
 
 LIVE_REGIONS = [
-    {"name": "California", "value": "us-west-1"}
+    {"name": "California", "value": "us-west-1"},
+    {"name": "Japan", "value": "ap-northeast-1"}
 ]
 
 dynamodb = boto3.resource("dynamodb")
@@ -37,9 +38,6 @@ def lambda_handler(event, context):
     # Extract required values
     target_region = body.get("region", "").strip()
     instance_name = body.get("instance_name", "").strip()
-    
-    ## TEMPORARY RESTRICTION
-    target_region = 'us-west-1'
 
     # Validate input
     if not instance_name or len(instance_name) == 0:
@@ -50,9 +48,17 @@ def lambda_handler(event, context):
             "statusCode": 400,
             "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
         }
+    if target_region not in [r["value"] for r in LIVE_REGIONS]:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Target region is not live"})
+        }
 
     # Fetch secrets
-    secrets = get_secret("VPN-Config", target_region)
+    if target_region == "us-west-1":
+        secrets = get_secret("VPN-Config", target_region)
+    else:
+        secrets = get_secret(f"wireguard/config/{target_region}", target_region)
     if not secrets:
         return {
             "statusCode": 500,
@@ -96,8 +102,7 @@ def lambda_handler(event, context):
 
     # Check if Image exists
     image_id = check_image_exists(target_region, vpn_image_id)
-
-    if "Does not exist in region" in image_id or "Error checking Image" in image_id:
+    if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": image_id})
@@ -108,7 +113,13 @@ def lambda_handler(event, context):
         shutdown_all_other_instances(LIVE_REGIONS)
 
     # Deploy the EC2 instance
-    instance_id, public_ip  = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
+    result = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
+    if not result:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Failed to deploy instance"})
+        }
+    instance_id, public_ip = result
 
     if not public_ip:
         return {

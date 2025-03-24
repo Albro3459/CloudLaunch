@@ -27,5 +27,9 @@
 
 
 export const live_regions = [
-    { name: "California", value: "us-west-1" }
+    // { name: "Brazil", value: "sa-east-1" },
+    { name: "California", value: "us-west-1" },
+    // { name: "England", value: "eu-west-2" },
+    { name: "Japan", value: "ap-northeast-1" },
+    // { name: "Korea", value: "ap-northeast-2" },
 ];

@@ -19,8 +19,6 @@ const Home: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    setRegion('us-west-1'); // :) temporary
     
     try {
         if (!jwtToken) {

@@ -31,7 +31,7 @@ export const lambdaHelper = async (region: string, token: string, instance_name 
 
         return {
             success: true,
-            data: result.data
+            data: result
         };
         
     } catch (error) {
