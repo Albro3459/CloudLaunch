@@ -1,8 +1,8 @@
 # VPN Cloud Automation:
 
-* Check out the quick demo here: https://youtu.be/1d3qo_34Vk4
+* Check out the quick demo here: [https://youtu.be/1d3qo_34Vk4](https://youtu.be/Zpeojm-HI8g)
 
-* Site is live at: https://albro3459.github.io/VPN_Cloud_Automation
+* Site is live at: [https://albro3459.github.io/VPN_Cloud_Automation](https://albro3459.github.io/VPN_Cloud_Automation)
 
   * Only the admin account is active for the time being.
 
@@ -25,7 +25,7 @@
    * Python for the AWS Lambda script
    * Firebase for Authentication
    * AWS tools used:
-     * EC2, AMI, Lambda, VPC (amd Subnet), Secrets Manager, IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
+     * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
      * A large amount of the work was done on AWS and with the AWS CLI
        * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: brodsky.alex22@gmail.com
       
@@ -39,17 +39,19 @@ See vpn-frontend folder for React README
 
 #### On Phone
 
+Demo in the YouTube video.
+
 Install the Wireguard app on your phone.
 
-Scan the QR code in the Wireguard app.
+Either download the config file or scan the QR code in the Wireguard app.
 
-Enable it in settings and you're done!
+Enable it in Wireguard and Settings and you're done!
 
 ---
 
 #### On Mac
 
-It's much better to just use the Wireguard Desktop app (as shown in the demo videos), but you can follow these steps instead:
+It's much better to just use the Wireguard Desktop app (as shown in the demo video), but you can follow these steps instead:
 
 Start WireGuard manually:
 ```sh
