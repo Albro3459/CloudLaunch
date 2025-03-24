@@ -1,6 +1,33 @@
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 
+REGION_NAME_MAP = {
+    "us-east-1": "Virginia",
+    "us-east-2": "Ohio",
+    "us-west-1": "California",
+    "us-west-2": "Oregon",
+    "ap-southeast-4": "Australia (Melbourne)",
+    "ap-southeast-2": "Australia (Sydney)",
+    "sa-east-1": "Brazil",
+    "ca-central-1": "Canada",
+    "eu-west-3": "France",
+    "eu-central-1": "Germany",
+    "ap-east-1": "Hong Kong",
+    "ap-south-2": "India (Hyderabad)",
+    "ap-south-1": "India (Mumbai)",
+    "ap-southeast-3": "Indonesia",
+    "eu-west-1": "Ireland",
+    "ap-northeast-3": "Japan (Osaka)",
+    "ap-northeast-1": "Japan (Tokyo)",
+    "ap-southeast-1": "Singapore",
+    "af-south-1": "South Africa",
+    "ap-northeast-2": "South Korea",
+    "eu-south-1": "Spain",
+    "eu-north-1": "Sweden",
+    "me-central-1": "United Arab Emirates",
+    "eu-west-2": "United Kingdom",
+}
+
 # Initialize Firebase Admin SDK
 def initialize_firebase(firebaseSecrets):
     if not firebase_admin._apps:  # Ensures Firebase is initialized only once
