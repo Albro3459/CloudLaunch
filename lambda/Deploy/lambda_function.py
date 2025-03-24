@@ -45,10 +45,10 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    if target_region == "us-west-1":
-        secrets = get_secret("VPN-Config", target_region)
-    else:
-        secrets = get_secret(f"wireguard/config/{target_region}", target_region)
+    # if target_region == "us-west-1":
+    #     secrets = get_secret("VPN-Config", target_region)
+    # else:
+    secrets = get_secret(f"wireguard/config/{target_region}", target_region)
     if not secrets:
         return {
             "statusCode": 500,
@@ -76,7 +76,6 @@ def lambda_handler(event, context):
     role = get_user_role(user_id)
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
-    initialize_firebase(firebaseSecrets) 
     live_regions = get_live_regions()
     if target_region not in [r["value"] for r in live_regions]:
         return {

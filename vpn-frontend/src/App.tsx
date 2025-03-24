@@ -6,6 +6,7 @@ import Success from "./pages/Success";
 import About from "./pages/About";
 import CreateUser from "./pages/CreateUser";
 import CreateUserSuccess from "./pages/CreateUserSuccess";
+import TerraformSuccess from "./pages/TerraformSuccess";
 
 const App: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ const App: React.FC = () => {
         <Route path="/about" element={<About />} />
         <Route path="/createUser" element={<CreateUser />} />
         <Route path="/createUserSuccess" element={<CreateUserSuccess />} />
+        <Route path="/terraformSuccess" element={<TerraformSuccess />} />
       </Routes>
     </Router>
   );

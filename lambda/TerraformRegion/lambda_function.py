@@ -4,8 +4,10 @@ import boto3
 import time
 
 from get_secrets import get_secret
+from firebase import initialize_firebase, verify_firebase_token, get_user_role
+from send_waiter import send_waiter_request
 
-# Terraforms a new region for VPN deployments
+# Terraform a new region for VPN deployments
 
 SOURCE_REGION = "us-west-1"
 
@@ -30,7 +32,7 @@ def check_if_ami_exists(ec2, base_name, max_attempts=50):
         print(f"Error checking for existing AMIs: {e}")
         return None
 
-def copy_image(target_region, source_vpn_image_id):
+def copy_image(target_region, source_vpn_image_id, waiter_request_url, token):
     ec2 = boto3.client("ec2", region_name=target_region)
     ami_name = f"{target_region}-VPN-image-EC2-v2"
     
@@ -48,11 +50,7 @@ def copy_image(target_region, source_vpn_image_id):
         vpn_image_id = response['ImageId']
         print(f"Copying AMI to {target_region}, new AMI: {ami_name}, ID: {vpn_image_id}")
 
-        # # Wait for AMI to become available
-        # print("Waiting for AMI to become available...")
-        # waiter = ec2.get_waiter('image_available')
-        # waiter.wait(ImageIds=[vpn_image_id])
-        # print(f"AMI copy complete. AMI ID: {vpn_image_id}")
+        send_waiter_request(target_region, vpn_image_id, waiter_request_url, token)
         
         return vpn_image_id
     except Exception as e:
@@ -191,17 +189,14 @@ def create_secrets_manager(region, values_dict):
         print(f"Secret updated: {secret_name}")
         return response['ARN']
 
-
 def lambda_handler(event, context):
     # Terraforms a new region for VPN deployments
-    # headers = event.get("headers", {})
-    # auth_header = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
-    # token = auth_header.replace("Bearer ", "")
+    headers = event.get("headers", {})
+    auth_header = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
+    token = auth_header.replace("Bearer ", "")
     
     try:
         body = json.loads(event.get("body", "{}"))
-        print("EVENT:", json.dumps(event))
-        print("BODY:", json.dumps(body))
     except json.JSONDecodeError:
         return {
             "statusCode": 400,
@@ -210,17 +205,35 @@ def lambda_handler(event, context):
 
     # Extract required values
     target_region = body.get("target_region", "").strip()
-    print("TARGET REGION:", target_region)
-    if not target_region or \
-        len(target_region) == 0:
+    waiter_url = body.get("waiter_url", "").strip()
+    if not target_region or not waiter_url or \
+        len(target_region) == 0 or len(waiter_url) == 0:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
+            "body": json.dumps({"error": f"Missing required parameters: {target_region}, {waiter_url}"})
         }
     try:
-        secrets = get_secret("VPN-Config", SOURCE_REGION)
+        secret_name = f"wireguard/config/{SOURCE_REGION}"
+        secrets = get_secret(secret_name, SOURCE_REGION)
         if not secrets:
-            raise Exception("Secret 'VPN-Config' not found")
+            raise Exception("Secret {secret_name} not found")
+        firebaseSecrets = get_secret("FirebaseServiceAccount", SOURCE_REGION)
+        if not firebaseSecrets:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+            }
+            
+        # Verify token
+        initialize_firebase(firebaseSecrets)
+        user_id = verify_firebase_token(token)
+        if not user_id:
+            return {"statusCode": 403, "body": json.dumps({"error": "Invalid or expired token"})}
+        role = get_user_role(user_id)
+        if not role: 
+            return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
+        if role != "admin":
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
 
         source_vpn_image_id = secrets.get("VPN_IMAGE_ID")
         source_key_name = secrets.get("KEY_NAME")
@@ -231,7 +244,7 @@ def lambda_handler(event, context):
         source_public_key_material = secrets.get("PUBLIC_KEY_MATERIAL")
 
         # --- Step 1: Copy AMI ---
-        new_vpn_image_id = copy_image(target_region, source_vpn_image_id)
+        new_vpn_image_id = copy_image(target_region, source_vpn_image_id, waiter_url, token)
         if not new_vpn_image_id:
             raise Exception("AMI Image couldn't be created")
 
@@ -262,16 +275,16 @@ def lambda_handler(event, context):
         print(f"Subnet ID: {subnet_id}")
         print(f"Security Group ID: {security_group_id}")
         print(f"Secret Manager ARN: {secrets_manager_arn}")
-        
+
         return {
             "statusCode": 200,
-            "body": {
+            "body": json.dumps({
                 "region": target_region,
-                "vpn_image_id": new_vpn_image_id,
-                "subnet_id": subnet_id,
-                "security_group_id": security_group_id,
-                "secret_arn": secrets_manager_arn
-            }
+                # "vpn_image_id": new_vpn_image_id,
+                # "subnet_id": subnet_id,
+                # "security_group_id": security_group_id,
+                # "secret_arn": secrets_manager_arn
+            })
         }
         
     except Exception as e:

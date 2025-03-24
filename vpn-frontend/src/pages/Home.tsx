@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { lambdaHelper } from "../helpers/APIHelper";
+import { terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
 import { aws_regions, getLiveRegions, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
@@ -19,7 +19,7 @@ const Home: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleDeploySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         
@@ -28,7 +28,7 @@ const Home: React.FC = () => {
                 console.error("Error: JWT token not found");
             }
             else {
-                const response = await lambdaHelper(region, jwtToken);
+                const response = await VPNdeployHelper(region, jwtToken);
             
                 setLoading(false);
 
@@ -50,9 +50,40 @@ const Home: React.FC = () => {
         }
     };
 
+    const handleTerraformSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        
+        try {
+            if (!jwtToken) {
+                console.error("Error: JWT token not found");
+            }
+            else {
+                const response = await terraformHelper(terraformRegion, jwtToken);
+            
+                setLoading(false);
+
+                if (!response.success) {
+                    setErrorMessage(response.error || "Something went wrong");
+                    return;
+                }
+
+                navigate("/terraformSuccess", {
+                    replace: true,
+                    state: { region: terraformRegion }
+                });
+            }
+
+        } catch (error) {
+        console.error("Error during deployment:", error);
+        }
+    };
+
     
     const handleCreateNewAccount = () => {
-        navigate("/CreateUser", { replace: true });
+        if (role === "admin") {
+            navigate("/CreateUser", { replace: true });
+        }
     }
 
     useEffect(() => {
@@ -131,7 +162,7 @@ const Home: React.FC = () => {
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
             <h2 className="text-2xl font-semibold text-center mb-6">Deploy VPN Instance</h2>
 
-            <form onSubmit={async (e) => { await handleSubmit(e); }}>
+            <form onSubmit={async (e) => { await handleDeploySubmit(e); }}>
             {/* AWS Region Dropdown */}
             <div className="mb-6">
                 <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
@@ -149,14 +180,16 @@ const Home: React.FC = () => {
                     </option>
                 ))}
                 </select>
-                <div className="ps-2 mt-2 text-xs">
-                    <a
-                    href="mailto:Brodsky.Alex22@gmail.com"
-                    className="text-blue-600 underline hover:text-blue-800"
-                    >
-                    Email me to request a region
-                    </a>
-                </div>
+                {role && role !== "admin" &&
+                    <div className="ps-2 mt-2 text-xs">
+                        <a
+                        href="mailto:Brodsky.Alex22@gmail.com"
+                        className="text-blue-600 underline hover:text-blue-800"
+                        >
+                        Email me to request a region
+                        </a>
+                    </div>
+                }
             </div>
             {/* Submit Button */}
             <button
@@ -181,7 +214,7 @@ const Home: React.FC = () => {
                 <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
                     <h2 className="text-2xl font-semibold text-center mb-6">Terraform New Region</h2>
 
-                    <form onSubmit={async (e) => { await handleSubmit(e); }}>
+                    <form onSubmit={async (e) => { await handleTerraformSubmit(e); }}>
                     {/* AWS Region Dropdown */}
                     <div className="mb-6">
                         <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>

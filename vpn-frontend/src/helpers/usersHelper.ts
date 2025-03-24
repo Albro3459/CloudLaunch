@@ -1,5 +1,6 @@
 import { User } from "firebase/auth";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { CREATE_USER_URL } from "../Secrets/API_URLs";
 
 export const createUser = async (username: string, password: string, token: string) => {
     try {
@@ -20,7 +21,7 @@ export const createUser = async (username: string, password: string, token: stri
             redirect: "follow"
         };
 
-        const response = await fetch("https://snsajcmvbq2alq5zplolwje72i0aoqnj.lambda-url.us-west-1.on.aws/", requestOptions);
+        const response = await fetch(CREATE_USER_URL, requestOptions);
         const result = await response.json();
 
         if (!response.ok) {
@@ -39,7 +40,7 @@ export const createUser = async (username: string, password: string, token: stri
         console.error("Create User API Error:", error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : "Unknown error"
+            error: error instanceof Error ? error.message : "Unknown Create User API Error"
         };
     }    
 };
