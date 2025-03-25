@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/VPN_Cloud_Automation/static/css/main.dd13bc23.css",
-    "main.js": "/VPN_Cloud_Automation/static/js/main.da5f9fd1.js",
+    "main.js": "/VPN_Cloud_Automation/static/js/main.404fbf40.js",
     "index.html": "/VPN_Cloud_Automation/index.html",
     "main.dd13bc23.css.map": "/VPN_Cloud_Automation/static/css/main.dd13bc23.css.map",
-    "main.da5f9fd1.js.map": "/VPN_Cloud_Automation/static/js/main.da5f9fd1.js.map"
+    "main.404fbf40.js.map": "/VPN_Cloud_Automation/static/js/main.404fbf40.js.map"
   },
   "entrypoints": [
     "static/css/main.dd13bc23.css",
-    "static/js/main.da5f9fd1.js"
+    "static/js/main.404fbf40.js"
   ]
 }
