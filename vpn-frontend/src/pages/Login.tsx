@@ -53,34 +53,43 @@ const Login: React.FC = () => {
             <h2 className="text-2xl font-semibold text-center mb-6">Login</h2>
 
             <form onSubmit={handleLogin}>
-            <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2">Username</label>
-                <input
-                    type="text"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(x) => setUsername(x.target.value)}
-                />
-            </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-medium mb-2">Username</label>
+                    <input
+                        type="text"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="Enter your username"
+                        value={username}
+                        onChange={(x) => setUsername(x.target.value)}
+                    />
+                </div>
 
-            <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2">Password</label>
-                <input
-                    type="password"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(x) => setPassword(x.target.value)}
-                />
-            </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-medium mb-2">Password</label>
+                    <input
+                        type="password"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(x) => setPassword(x.target.value)}
+                    />
+                </div>
 
-            <button
-                type="submit"
-                className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
-            >
-                Login
-            </button>
+                <button
+                    type="submit"
+                    className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
+                >
+                    Login
+                </button>
+
+                <div className="ps-2 mt-2 text-xs">
+                    <a
+                    href="mailto:Brodsky.Alex22@gmail.com"
+                    className="text-blue-600 underline hover:text-blue-800"
+                    >
+                    Email me for a test account
+                    </a>
+                </div>
             </form>
         </div>
         </div>
