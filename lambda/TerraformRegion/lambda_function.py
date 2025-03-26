@@ -5,6 +5,7 @@ import time
 
 from get_secrets import get_secret
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
+from cleanup import cleanup_region
 from send_waiter import send_waiter_request
 
 # Terraform a new region for VPN deployments
@@ -33,11 +34,14 @@ def check_if_ami_exists(ec2, base_name, max_attempts=50):
         return None
 
 def copy_image(target_region, source_vpn_image_id, waiter_request_url, token):
+    if target_region == SOURCE_REGION:
+        print(f"Cannot copy AMI to source region")
+        return None
     ec2 = boto3.client("ec2", region_name=target_region)
     ami_name = f"{target_region}-VPN-image-EC2-v2"
     
     existing_image_id = check_if_ami_exists(ec2, ami_name)
-    if existing_image_id != "":
+    if existing_image_id and existing_image_id != "":
         print(f"AMI Image in {target_region} already exists: {existing_image_id}")
         return existing_image_id
     
@@ -48,6 +52,7 @@ def copy_image(target_region, source_vpn_image_id, waiter_request_url, token):
             Name=ami_name
         )
         vpn_image_id = response['ImageId']
+        vpn_image_id = "ami-0add8722b5b5da291"
         print(f"Copying AMI to {target_region}, new AMI: {ami_name}, ID: {vpn_image_id}")
 
         send_waiter_request(target_region, vpn_image_id, waiter_request_url, token)
@@ -204,26 +209,33 @@ def lambda_handler(event, context):
         }
 
     # Extract required values
-    target_region = body.get("target_region", "").strip()
-    waiter_url = body.get("waiter_url", "").strip()
-    if not target_region or not waiter_url or \
-        len(target_region) == 0 or len(waiter_url) == 0:
+    region_to_clean = body.get("region_to_clean", "").strip()
+    if not region_to_clean:
+        target_region = body.get("target_region", "").strip()
+        waiter_url = body.get("waiter_url", "").strip()
+        if not target_region or not waiter_url or \
+            len(target_region) == 0 or len(waiter_url) == 0:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f"Missing required parameters: {target_region}, {waiter_url}"})
+            }
+        elif target_region == SOURCE_REGION:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f"ERROR: Illegal Request"})
+            }
+    elif region_to_clean == SOURCE_REGION:
         return {
-            "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {target_region}, {waiter_url}"})
-        }
+                "statusCode": 400,
+                "body": json.dumps({"error": f"ERROR: User made an Illegal Request"})
+            }
     try:
-        secret_name = f"wireguard/config/{SOURCE_REGION}"
-        secrets = get_secret(secret_name, SOURCE_REGION)
-        if not secrets:
-            raise Exception("Secret {secret_name} not found")
         firebaseSecrets = get_secret("FirebaseServiceAccount", SOURCE_REGION)
         if not firebaseSecrets:
             return {
                 "statusCode": 500,
                 "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
-            }
-            
+            }        
         # Verify token
         initialize_firebase(firebaseSecrets)
         user_id = verify_firebase_token(token)
@@ -234,6 +246,21 @@ def lambda_handler(event, context):
             return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
         if role != "admin":
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
+        
+        if region_to_clean and region_to_clean != SOURCE_REGION:
+            cleanup_region(region_to_clean, SOURCE_REGION)
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "target_region": None,
+                    "region_cleaned": region_to_clean
+                })
+            }
+        
+        secret_name = f"wireguard/config/{SOURCE_REGION}"
+        secrets = get_secret(secret_name, SOURCE_REGION)
+        if not secrets:
+            raise Exception("Secret {secret_name} not found")
 
         source_vpn_image_id = secrets.get("VPN_IMAGE_ID")
         source_key_name = secrets.get("KEY_NAME")
@@ -279,11 +306,8 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "region": target_region,
-                # "vpn_image_id": new_vpn_image_id,
-                # "subnet_id": subnet_id,
-                # "security_group_id": security_group_id,
-                # "secret_arn": secrets_manager_arn
+                "target_region": target_region,
+                "region_cleaned": None
             })
         }
         

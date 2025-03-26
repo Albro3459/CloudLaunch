@@ -7,8 +7,11 @@ from firebase_admin import credentials, auth, firestore
 
 from get_secrets import get_secret
 from firebase import initialize_firebase, is_region_live, update_live_regions, verify_firebase_token, get_user_role
+from send_email import send_email
 
 SOURCE_REGION = "us-west-1"
+SENDER="brodsky.alex22@gmail.com"
+RECIPIENT="brodsky.alex22@gmail.com"
 
 # Waits until AMI is live and sets the region to live in Firebase
 
@@ -119,8 +122,14 @@ def lambda_handler(event, context):
             "statusCode": 400,
             "body": json.dumps({"error": f"Failed to update Firebase for: {region}"})
         }
-        
+            
         print(f"AMI ID: {ami_id} ready in Region: {region}")
+        
+        ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
+        sent_email = send_email(ses_client, region, SENDER, RECIPIENT)
+        if not sent_email:
+            print("Email failed to send")
+        
         return {
             "statusCode": 200,
             "body": json.dumps({

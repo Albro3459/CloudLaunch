@@ -45,9 +45,6 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    # if target_region == "us-west-1":
-    #     secrets = get_secret("VPN-Config", target_region)
-    # else:
     secrets = get_secret(f"wireguard/config/{target_region}", target_region)
     if not secrets:
         return {

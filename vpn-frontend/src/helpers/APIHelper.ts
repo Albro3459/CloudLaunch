@@ -42,14 +42,21 @@ export const VPNdeployHelper = async (region: string, token: string, instance_na
     }
 };
 
-export const terraformHelper = async (region: string, token: string) => {
+export enum TERRAFORM_ENUM {
+    TERRAFORM,
+    CLEAN
+}
+
+export const terraformHelper = async (region: string, token: string, cleanUp:TERRAFORM_ENUM=TERRAFORM_ENUM.TERRAFORM) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
+        // CleanUp is if the lambda script should delete the AMIs and Snapshots in that region
+        const key = cleanUp === TERRAFORM_ENUM.CLEAN ? "region_to_clean" : "target_region";
         const raw = JSON.stringify({
-            "target_region": region,
+            [key]: region,
             "waiter_url": AMI_WAITER_URL
         });
 

@@ -31,3 +31,17 @@ def get_user_role(uid):
     except Exception as e:
         print("Error fetching role:", e)
         return None
+    
+def remove_live_region(region):
+    """
+    Removes the given region from the 'Live-Regions' Firestore collection.
+    """
+    try:
+        db = firestore.client()
+        doc_ref = db.collection("Live-Regions").document(region)
+        doc_ref.delete()
+        print(f"Region '{region}' removed from Live-Regions.")
+        return True
+    except Exception as e:
+        print(f"Error removing region from Firestore: {e}")
+        return False

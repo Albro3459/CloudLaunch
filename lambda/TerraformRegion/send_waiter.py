@@ -3,7 +3,7 @@ import requests
 
 def send_waiter_request(region, ami_id, request_url, token):
     """
-    Sends a POST request to the Terraform API to wait for the AMI to become available.
+    Sends a POST request to the Waiter API to wait for the AMI to become available.
     """
     headers = {
         "Authorization": f"Bearer {token}",
@@ -24,6 +24,6 @@ def send_waiter_request(region, ami_id, request_url, token):
         print(f"Response: {response.text}")
         # No need to process result — we're ignoring it for now
     except requests.exceptions.Timeout:
-        print("Terraform API call timed out (as expected). Moving on.")
+        print("Waiter API call successfully timed out (as expected). Moving on.")
     except Exception as e:
-        print(f"Terraform API Error: {str(e)}")
+        print(f"Waiter API Error: {str(e)}")
