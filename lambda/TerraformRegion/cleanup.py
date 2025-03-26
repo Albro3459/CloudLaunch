@@ -3,6 +3,7 @@ from firebase import remove_live_region
 
 def terminate_old_vpn_instances(region, tag_value='VPN-*'):
     ec2 = boto3.resource("ec2", region_name=region)
+    client = boto3.client("ec2", region_name=region)
     filters = [
         {"Name": "instance-state-name", "Values": ["running", "pending"]},
         {"Name": "tag:Name", "Values": [tag_value]}
@@ -15,6 +16,9 @@ def terminate_old_vpn_instances(region, tag_value='VPN-*'):
     if instances_to_terminate:
         ec2.instances.filter(InstanceIds=instances_to_terminate).terminate()
         print(f"Terminated instances: {instances_to_terminate}")
+        waiter = client.get_waiter('instance_terminated')
+        waiter.wait(InstanceIds=instances_to_terminate)
+        print("Confirmed instances are fully terminated.")
     else:
         print("No other instances to terminate.")
     return True

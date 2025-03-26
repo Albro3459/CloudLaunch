@@ -7,7 +7,7 @@ from firebase_admin import credentials, auth, firestore
 
 from get_secrets import get_secret
 from firebase import initialize_firebase, is_region_live, update_live_regions, verify_firebase_token, get_user_role
-from send_email import send_email
+from notify import send_email
 
 SOURCE_REGION = "us-west-1"
 SENDER="brodsky.alex22@gmail.com"

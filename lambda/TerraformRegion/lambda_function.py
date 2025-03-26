@@ -52,7 +52,6 @@ def copy_image(target_region, source_vpn_image_id, waiter_request_url, token):
             Name=ami_name
         )
         vpn_image_id = response['ImageId']
-        vpn_image_id = "ami-0add8722b5b5da291"
         print(f"Copying AMI to {target_region}, new AMI: {ami_name}, ID: {vpn_image_id}")
 
         send_waiter_request(target_region, vpn_image_id, waiter_request_url, token)
