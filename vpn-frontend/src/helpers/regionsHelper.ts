@@ -15,12 +15,10 @@ export const aws_regions = [
 { name: "Ireland", value: "eu-west-1" },
 { name: "Japan (Osaka)", value: "ap-northeast-3" },
 { name: "Japan (Tokyo)", value: "ap-northeast-1" },
-{ name: "Mexico", value: "mx-central-1" },
 { name: "Singapore", value: "ap-southeast-1" },
 { name: "South Africa", value: "af-south-1" },
 { name: "South Korea", value: "ap-northeast-2" },
 { name: "Sweden", value: "eu-north-1" },
-{ name: "United Arab Emirates", value: "me-central-1" },
 { name: "United Kingdom", value: "eu-west-2" },
 ];
 
