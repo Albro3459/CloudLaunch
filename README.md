@@ -27,7 +27,7 @@
    * Firebase for Authentication and Database
    * AWS tools used:
      * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, SES, and the AWS CLI
-   * I configured an EC2 instance with Wireguard, then turned it into the AMI image that can be automatically deployed to any region from the frontend with Lambda scripts.
+   * EC2 instance configured with Wireguard, then turned it into the AMI image that can be automatically deployed to any region from the frontend with Lambda scripts.
    * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: [brodsky.alex22@gmail.com](brodsky.alex22@gmail.com)
 
 ## Usage
