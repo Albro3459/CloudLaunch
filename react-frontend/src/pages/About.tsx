@@ -54,7 +54,7 @@ const About: React.FC = () => {
                     <b>Created by: </b>Alex Brodsky 
                     <br></br>
                     <a
-                        href="https://github.com/Albro3459/VPN_Cloud_Automation/tree/main"
+                        href="https://github.com/Albro3459/CloudLaunch/tree/main"
                         className="text-xs text-blue-600 underline hover:text-blue-800"
                         >
                         GitHub

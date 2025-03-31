@@ -18,7 +18,7 @@ def send_email(ses_client, region, sender, recipient):
     
     subject = f"Region {region} is now live!"
     body_text = (
-        f"From VPN Deployer,\n\n"
+        f"From CloudLaunch,\n\n"
         f"The WireGuard AMI is now live in region: {region}\n\n"
         f"Timestamp: {timestamp}\n\n"
         f"Enjoy!"

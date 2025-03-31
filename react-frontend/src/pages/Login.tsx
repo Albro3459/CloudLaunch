@@ -43,7 +43,7 @@ const Login: React.FC = () => {
             >
                 About
             </button>
-            <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
+            <h1 className="text-xl font-semibold align-self-center">CloudLaunch</h1>
         </nav>
 
         {error && <p>{error}</p>}

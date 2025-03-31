@@ -1,6 +1,6 @@
 {
-  "name": "vpn-frontend",
-  "homepage": "https://albro3459.github.io/VPN_Cloud_Automation",
+  "name": "react-frontend",
+  "homepage": "https://albro3459.github.io/CloudLaunch",
   "version": "0.1.0",
   "private": true,
   "dependencies": {

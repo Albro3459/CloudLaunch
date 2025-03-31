@@ -1,8 +1,8 @@
-# VPN Cloud Automation:
+# CloudLaunch:
 
 * Check out the quick demo on [YouTube](https://youtu.be/Zpeojm-HI8g)
 
-* The website is live at: [https://albro3459.github.io/VPN_Cloud_Automation](https://albro3459.github.io/VPN_Cloud_Automation)
+* The website is live at: [https://albro3459.github.io/CloudLaunch](https://albro3459.github.io/CloudLaunch)
 
   * Only the admin account is active for the time being.
  
@@ -63,4 +63,4 @@
 
 ### Running the React Site:
 
-* See vpn-frontend folder for React README
+* See react-frontend folder for React README
