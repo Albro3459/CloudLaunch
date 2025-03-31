@@ -1,6 +1,6 @@
 {
-  "short_name": "VPN Deployer",
-  "name": "AWS WireGuard VPN Automated Deployer",
+  "short_name": "CloudLaunch",
+  "name": "AWS WireGuard Cloud Automated VPN Deployer",
   "icons": [
     {
       "src": "favicon.ico",
