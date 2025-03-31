@@ -20,82 +20,47 @@
  * Generate your VPN configuration instantly, download the .conf file, or scan a QR code for easy setup on your devices—all in just a few clicks.
 
  * Secure, simple, and instant. Your personal cloud VPN, deployed on demand with little to no setup needed.
-
----
  
 ## Languages and Frameworks:
    * React with TypeScript and TailwindCSS for the Frontend
    * Python for the AWS Lambda script
    * Firebase for Authentication and Database
    * AWS tools used:
-     * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, ECR (ended up not needing it though), and the CLI
+     * EC2, AMI, Lambda, DynamoDB, Secrets Manager, VPC (amd Subnet), IAM, CloudWatch, SES, and the CLI
      * A large amount of the work was done on AWS and with the AWS CLI
        * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: [brodsky.alex22@gmail.com](brodsky.alex22@gmail.com)
-      
----
 
-#### Running React Site:
-
-See vpn-frontend folder for React README
-
----
+## Usage
 
 #### On Phone
 
-Demo in the YouTube video.
+* Demo in the YouTube video.
 
-Install the Wireguard app on your phone.
+* Install the Wireguard app on your phone.
 
-Either download the config file or scan the QR code in the Wireguard app.
+* Either download the config file or scan the QR code in the Wireguard app.
 
-Enable it in Wireguard and Settings and you're done!
-
----
+* Enable it in Wireguard and Settings and you're done!
 
 #### On Mac
 
-It's much better to just use the Wireguard Desktop app (as shown in the demo video), but you can follow these steps instead:
+* It's much easier to use the Wireguard Desktop app (as shown in the demo video), but you can follow these steps instead:
 
-Start WireGuard manually:
-```sh
-wg-quick up wg-client
-```
+* Start WireGuard manually:
+  ```sh
+  wg-quick up wg-client
+  ```
 
-Check status:
-```sh
-sudo wg
-```
+* Check status:
+  ```sh
+  sudo wg
+  ```
 
-To stop it:
-```sh
-wg-quick down wg-client
-```
+* To stop it:
+  ```sh
+  wg-quick down wg-client
+  ```
 
----
+### Running the React Site:
 
-#### On the Server (EC2)
-
-Restart the WireGuard service:
-```sh
-sudo systemctl restart wg-quick@wg0
-```
-
-Enable it to start on boot:
-```sh
-sudo systemctl enable wg-quick@wg0
-```
-
-Check if it's running:
-```sh
-sudo systemctl status wg-quick@wg0
-```
-
-To see connected clients:
-```sh
-sudo wg show
-```
-
-To disable WireGuard (prevent auto-start):
-```sh
-sudo systemctl disable wg-quick@wg0
-```
+* See vpn-frontend folder for React README
