@@ -127,9 +127,36 @@ def delete_VPCs(ec2, tag_key='Name', tag_value='wireguard-vpc'):
             return False
     return True
 
-def cleanup_region(region, source_region):
+def delete_Secrets(region):
+    secrets = boto3.client('secretsmanager', region_name=region)
+    secret_name = f"wireguard/config/{region}"
+
+    try:
+        secrets.delete_secret(
+            SecretId=secret_name,
+            ForceDeleteWithoutRecovery=True  # Immediately deletes without recovery window
+        )
+        print(f"Secret deleted: {secret_name}")
+        return True
+    except Exception as e:
+        print(f"Error deleting secret {secret_name}: {e}")
+        return False
+
+def delete_KeyPairs(ec2, key_pair_name):
+    try:
+        ec2.delete_key_pair(KeyName=key_pair_name)
+        print(f"Key pair deleted")
+        return True
+    except Exception as e:
+        print(f"Error deleting key pair: {e}")
+        return False
+
+def cleanup_region(region, source_region, key_pair_name):
     if region == source_region:
         print(f"Cannot cleanup source region")
+        return
+    if not key_pair_name:
+        print(f"Key Pair Name is required for cleanup")
         return
     
     ec2 = boto3.client('ec2', region_name=region)
@@ -147,8 +174,14 @@ def cleanup_region(region, source_region):
     
     print(f"Deleting VPCs, Subnets, IGWs, and Route Tables in {region}")
     D = delete_VPCs(ec2, 'Name', 'wireguard-vpc')
+
+    print(f"Deleting Secrets in {region}")
+    E = delete_Secrets(region)
+
+    print(f"Deleting Key Pairs in {region}")
+    F = delete_KeyPairs(ec2, key_pair_name)
     
-    if A and B and C and D:
+    if A and B and C and D and E and F:
         print(f"Removing region {region} from Live-Regions collection")
         remove_live_region(region)
         return True

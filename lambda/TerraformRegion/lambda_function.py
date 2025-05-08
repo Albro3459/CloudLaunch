@@ -166,7 +166,7 @@ def import_key_pair(region, key_name, public_key_material):
         return response['KeyName']
     except ec2.exceptions.ClientError as e:
         if "InvalidKeyPair.Duplicate" in str(e):
-            print(f"Key pair '{key_name}' already exists in {region} — skipping import")
+            print(f"Key pair '{key_name}' already exists in {region} - skipping import")
             return key_name
         else:
             raise
@@ -185,7 +185,7 @@ def create_secrets_manager(region, values_dict):
         return response['ARN']
 
     except secrets.exceptions.ResourceExistsException:
-        print(f"Secret already exists: {secret_name} — updating instead...")
+        print(f"Secret already exists: {secret_name} - updating instead...")
         response = secrets.update_secret(
             SecretId=secret_name,
             SecretString=secret_string
@@ -245,17 +245,8 @@ def lambda_handler(event, context):
             return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
         if role != "admin":
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
-        
-        if region_to_clean and region_to_clean != SOURCE_REGION:
-            cleanup_region(region_to_clean, SOURCE_REGION)
-            return {
-                "statusCode": 200,
-                "body": json.dumps({
-                    "target_region": None,
-                    "region_cleaned": region_to_clean
-                })
-            }
-        
+
+        # Get Secrets
         secret_name = f"wireguard/config/{SOURCE_REGION}"
         secrets = get_secret(secret_name, SOURCE_REGION)
         if not secrets:
@@ -268,6 +259,24 @@ def lambda_handler(event, context):
         source_client_private_key = secrets.get("CLIENT_PRIVATE_KEY")
         source_server_public_key = secrets.get("SERVER_PUBLIC_KEY")
         source_public_key_material = secrets.get("PUBLIC_KEY_MATERIAL")
+        
+        if region_to_clean and region_to_clean != SOURCE_REGION:
+            if cleanup_region(region_to_clean, SOURCE_REGION, source_key_name):
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps({
+                        "target_region": None,
+                        "region_cleaned": region_to_clean
+                    })
+                }
+            else:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({
+                        "target_region": None,
+                        "region_cleaned": region_to_clean
+                    })
+                }
 
         # --- Step 1: Copy AMI ---
         new_vpn_image_id = copy_image(target_region, source_vpn_image_id, waiter_url, token)

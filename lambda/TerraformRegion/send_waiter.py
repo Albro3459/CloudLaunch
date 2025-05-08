@@ -22,7 +22,7 @@ def send_waiter_request(region, ami_id, request_url, token):
         )
         print(f"Status Code: {response.status_code}")
         print(f"Response: {response.text}")
-        # No need to process result — we're ignoring it for now
+        # No need to process result - we're ignoring it for now
     except requests.exceptions.Timeout:
         print("Waiter API call successfully timed out (as expected). Moving on.")
     except Exception as e:
