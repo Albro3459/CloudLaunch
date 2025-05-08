@@ -8,7 +8,7 @@ import { SOURCE_REGION } from "../Secrets/source_region";
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
-    //   const [username, setUsername] = useState<string | null>(null);
+
     const [liveRegions, setLiveRegions] = useState<Region[] | null>();
 
     const [region, setRegion] = useState("");
@@ -144,9 +144,6 @@ const Home: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
                 if (user) {
-                    // const email = user.email || "";
-                    // const extractedUsername = email.split("@")[0];
-                    // setUsername(extractedUsername);
                     setRole(await getUserRole(user));
                     try {
                         const token = await getIdToken(user);

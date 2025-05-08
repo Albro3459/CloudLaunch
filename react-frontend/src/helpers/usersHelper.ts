@@ -2,13 +2,12 @@ import { User } from "firebase/auth";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
 import { CREATE_USER_URL } from "../Secrets/API_URLs";
 
-export const createUser = async (username: string, password: string, token: string) => {
+export const createUser = async (email: string, password: string, token: string) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
-        const email = `${username}@example.com`;
         const raw = JSON.stringify({
             "email": email,
             "password": password

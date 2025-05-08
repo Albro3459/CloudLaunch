@@ -3,20 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { auth, onAuthStateChanged, signInWithEmailAndPassword } from "../firebase";
 
 const Login: React.FC = () => {
-
     const navigate = useNavigate();
-    const [username, setUsername] = useState("");
+    
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
+    const [error, setError] = useState<string | null>();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const email = username + "@example.com";
+            if (!email.includes('@') || !email.includes('.')) {
+                setError("Not a valid email.");
+                return;
+            }
             await signInWithEmailAndPassword(auth, email, password);
             navigate("/home", { replace: true });
         } catch (err) {
-            // alert("Invalid username or password!");
             setError("Invalid email or password.");
         }
     };
@@ -46,7 +48,27 @@ const Login: React.FC = () => {
             <h1 className="text-xl font-semibold align-self-center">CloudLaunch</h1>
         </nav>
 
-        {error && <p>{error}</p>}
+        {/* {error && <p>{error}</p>} */}
+        {/* Error or Success */}
+        {(error) && (
+            <div className="fixed top-20 w-full flex justify-center z-50">
+            <div className={`px-6 py-3 rounded-xl shadow-md w-full max-w-md flex justify-between items-center ${
+                error ? "bg-red-500 text-white" : "bg-green-500 text-white"
+            }`}>
+                <span className="text-sm">
+                {error}
+                </span>
+                <button
+                className="ml-4 font-bold hover:text-gray-200 transition"
+                onClick={() => {
+                    setError(null);
+                }}
+                >
+                ✕
+                </button>
+            </div>
+            </div>
+        )}
 
         {/* Login Form */}
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-sm mt-10">
@@ -54,13 +76,13 @@ const Login: React.FC = () => {
 
             <form onSubmit={handleLogin}>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-medium mb-2">Username</label>
+                    <label className="block text-gray-700 font-medium mb-2">Email</label>
                     <input
                         type="text"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        placeholder="Enter your username"
-                        value={username}
-                        onChange={(x) => setUsername(x.target.value)}
+                        placeholder="Enter your email"
+                        value={email}
+                        onChange={(x) => setEmail(x.target.value)}
                     />
                 </div>
 

@@ -10,7 +10,7 @@ const CreateUser: React.FC = () => {
     const navigate = useNavigate();
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -73,15 +73,20 @@ const CreateUser: React.FC = () => {
                 return;
             }
             else {
-                username.trim();
-                const result = await createUser(username, password, jwtToken);
+                email.trim();
+                if (!email.includes('@') || !email.includes('.')) {
+                    setLoading(false);
+                    setErrorMessage("Error: Not a valid email.");
+                    return;
+                }
+                const result = await createUser(email, password, jwtToken);
                 setLoading(false);
                 if (result.success) {
-                    setSuccessMessage(`Created user: ${username}`);
-                    setUsername(""); setPassword(""); setConfirmPassword("");
+                    setSuccessMessage(`Created user: ${email}`);
+                    setEmail(""); setPassword(""); setConfirmPassword("");
                     navigate("/CreateUserSuccess", {
                         replace: true,
-                        state: { username: username, password: password }
+                        state: { email: email, password: password }
                     });
                 }
                 else {
@@ -139,15 +144,15 @@ const CreateUser: React.FC = () => {
                 <h2 className="text-2xl font-semibold text-center mb-6">Create New User</h2>
 
                 <form onSubmit={handleCreateAccount}>
-                {/* Username */}
+                {/* Email */}
                 <div className="mb-6">
-                    <label className="block text-gray-700 font-medium mb-2">Username</label>
+                    <label className="block text-gray-700 font-medium mb-2">Email</label>
                     <input
                     type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="Username"
+                    placeholder="Email"
                     />
                 </div>
                 {/* Password */}
@@ -179,11 +184,11 @@ const CreateUser: React.FC = () => {
                 <button
                     type="submit"
                     className={`w-full p-3 rounded-lg transition ${
-                    username && password
+                    email && password
                         ? "cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-gray-400 text-gray-200 cursor-not-allowed"
                     }`}
-                    disabled={!username || !password}
+                    disabled={!email || !password}
                 >
                     Create Account
                 </button>

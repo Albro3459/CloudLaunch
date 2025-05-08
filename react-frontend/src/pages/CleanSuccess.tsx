@@ -10,7 +10,6 @@ interface CleanSuccessState {
 
 const CleanSuccess: React.FC = () => {
     const navigate = useNavigate();
-    // const [username, setUsername] = useState<string | null>(null);
 
     const location = useLocation();
     const { 

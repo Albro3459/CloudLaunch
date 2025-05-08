@@ -5,26 +5,25 @@ import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { auth, onAuthStateChanged, signOut } from "../firebase";
 
 interface CreateUserSuccessState {
-    username: string | null;
+    email: string | null;
     password: string | null;
 }
 
 const CreateUserSuccess: React.FC = () => {
     const navigate = useNavigate();
-    // const [username, setUsername] = useState<string | null>(null);
 
     const location = useLocation();
     const { 
-        username,
+        email,
         password,
     } = (location.state || {}) as Partial<CreateUserSuccessState>;
 
     const userExists = useCallback(() => {
         return (
-          username && password &&
-          username.length > 0 && password.length > 0
+            email && password &&
+            email.length > 0 && password.length > 0
         );
-      }, [username, password]);
+      }, [email, password]);
 
     useEffect(() => {
         if (!userExists()
@@ -76,7 +75,7 @@ const CreateUserSuccess: React.FC = () => {
                 {userExists() ? (
                     <p className="text-gray-700">
                     User{" "}
-                    { <b>{username}</b>} has been created.
+                    { <b>{email}</b>} has been created.
                     </p>
                 ) : (
                     <p className="text-gray-700">No user was created.</p>

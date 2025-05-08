@@ -10,7 +10,6 @@ interface TerraformSuccessState {
 
 const TerraformSuccess: React.FC = () => {
     const navigate = useNavigate();
-    // const [username, setUsername] = useState<string | null>(null);
 
     const location = useLocation();
     const { 

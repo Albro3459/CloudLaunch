@@ -17,7 +17,6 @@ interface SuccessState {
 
 const Success: React.FC = () => {
     const navigate = useNavigate();
-    // const [username, setUsername] = useState<string | null>(null);
 
     const location = useLocation();
     const { 
@@ -59,13 +58,7 @@ const Success: React.FC = () => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
-                // console.log(instanceName);
-                // console.log(region);
-                // console.log(ip);
                 if (user) {
-                    // const email = user.email || "";
-                    // const extractedUsername = email.split("@")[0];
-                    // setUsername(extractedUsername);
                 } else {
                     await signOut(auth);
                     navigate("/", { replace: true });

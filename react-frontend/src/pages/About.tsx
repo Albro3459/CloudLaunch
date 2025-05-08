@@ -6,15 +6,14 @@ import { auth, onAuthStateChanged, signOut } from "../firebase";
 
 const About: React.FC = () => {
     const navigate = useNavigate();
-    const [username, setUsername] = useState<string | null>(null);
+    const [email, setEmail] = useState<string | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
                 if (user) {
                     const email = user.email || "";
-                    const extractedUsername = email.split("@")[0];
-                    setUsername(extractedUsername);
+                    setEmail(email);
                 }
             };
             fetchUserData();
@@ -37,7 +36,7 @@ const About: React.FC = () => {
                     className="text-2xl cursor-pointer absolute left-6" 
                 />
                 <h1 className="text-xl font-semibold align-self-center">About</h1>
-                {username && username.length > 0 &&            
+                {email && email.length > 0 &&            
                 <button 
                     onClick={handleLogout} 
                     className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
