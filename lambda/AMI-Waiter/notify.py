@@ -1,15 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
-
-import email.utils
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 def get_timestamp():
     central = ZoneInfo("America/Chicago")
     now = datetime.now(central)
     tz_label = now.tzname()
-    timestamp = now.strftime(f"%Y-%m-%d %a %I:%M:%S %p ({tz_label})")
+    timestamp = now.strftime(f"%m/%d/%Y %a %I:%M:%S %p ({tz_label})")
     return timestamp
 
 def send_email(ses_client, region, sender, recipient):
@@ -19,7 +15,7 @@ def send_email(ses_client, region, sender, recipient):
     subject = f"Region {region} is now live!"
     body_text = (
         f"From CloudLaunch,\n\n"
-        f"The WireGuard AMI is now live in region: {region}\n\n"
+        f"The WireGuard AMI is now live in: {region}\n\n"
         f"Timestamp: {timestamp}\n\n"
         f"Enjoy!"
     )
