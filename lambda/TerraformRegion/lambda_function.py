@@ -250,7 +250,7 @@ def lambda_handler(event, context):
         secret_name = f"wireguard/config/{SOURCE_REGION}"
         secrets = get_secret(secret_name, SOURCE_REGION)
         if not secrets:
-            raise Exception("Secret {secret_name} not found")
+            raise Exception(f"Secret {secret_name} not found")
 
         source_vpn_image_id = secrets.get("VPN_IMAGE_ID")
         source_key_name = secrets.get("KEY_NAME")

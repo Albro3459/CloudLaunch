@@ -1,17 +1,18 @@
 import json
 import requests
 
-def send_waiter_request(region, ami_id, request_url, token):
+def send_waiter_request(region, instance_name, email, request_url, token):
     """
-    Sends a POST request to the Waiter API to wait for the AMI to become available.
+    Sends a POST request to the Waiter API to wait for the VPN to deploy.
     """
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
     payload = {
-        "wait_type": "image",
-        "ami_id": ami_id,
+        "wait_type": "VPN",
+        "instance_name": instance_name,
+        "email": email,
         "region": region
     }
     try:

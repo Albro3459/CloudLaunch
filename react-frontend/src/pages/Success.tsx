@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { generateConfig } from "../helpers/confHelper";
+import { generateConfig } from "../helpers/configHelper";
 import QRCode from "qrcode";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon

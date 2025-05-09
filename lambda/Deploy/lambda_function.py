@@ -5,6 +5,7 @@ from vpn_manager import check_image_exists, deploy_instance, shutdown_all_other_
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
 from firebase import get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
+from send_waiter import send_waiter_request
 
 CLEANUP_VPNS = True
 
@@ -31,17 +32,25 @@ def lambda_handler(event, context):
         }
 
     # Extract required values
+    waiter_url = body.get("waiter_url", "").strip()
+    email = body.get("email", "").strip()
     target_region = body.get("region", "").strip()
     instance_name = body.get("instance_name", "").strip()
 
     # Validate input
-    if not instance_name or len(instance_name) == 0:
-        instance_name = "VPN"
-    if not target_region or not token or \
-        len(target_region) == 0 or len(token) == 0:
+    if not waiter_url:
+        print("Missing Waiter API URL")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
+            "body": json.dumps({"error": f"Missing Waiter API URL"})
+        }
+    if not instance_name or len(instance_name) == 0:
+        instance_name = "VPN"
+    if not target_region or not email or not token:
+        print(f"Missing required parameters: {target_region}, {email}, {token}")
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": f"Missing required parameters: {target_region}, {email}"})
         }
 
     # Fetch secrets
@@ -124,6 +133,8 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve instance ID"})
         }
+        
+    send_waiter_request(target_region, instance_name, email, waiter_url, token)
 
     return {
         "statusCode": 200,

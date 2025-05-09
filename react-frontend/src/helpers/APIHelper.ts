@@ -1,12 +1,14 @@
 import { AMI_WAITER_URL, DEPLOY_URL, TERRAFORM_URL } from "../Secrets/API_URLs";
 
-export const VPNdeployHelper = async (region: string, token: string, instance_name = "VPN") => {
+export const VPNdeployHelper = async (region: string, email: string, token: string, instance_name = "VPN") => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
         const raw = JSON.stringify({
+            "waiter_url": AMI_WAITER_URL,
+            "email": email,
             "region": region,
             "instance_name": instance_name
         });
