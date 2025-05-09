@@ -1,12 +1,9 @@
-# Use AWS Lambda's Python base image
-FROM public.ecr.aws/lambda/python:3.8
+# Use AWS Lambda Python base image for x86_64
+FROM public.ecr.aws/lambda/python:3.11
 
-# Install dependencies
+# Set working directory inside container
+WORKDIR /layer
+
+# Install required packages into /layer/python
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir firebase-admin boto3
-
-# Copy the Lambda function
-COPY lambda_function.py ${LAMBDA_TASK_ROOT}
-
-# Set the Lambda function entry point
-CMD ["lambda_function.lambda_handler"]
+    pip install --no-cache-dir firebase-admin google-cloud-firestore requests qrcode[pil] -t python/

@@ -5,7 +5,7 @@ def get_timestamp():
     central = ZoneInfo("America/Chicago")
     now = datetime.now(central)
     tz_label = now.tzname()
-    timestamp = now.strftime(f"%m/%d/%Y %a %I:%M:%S %p ({tz_label})")
+    timestamp = now.strftime(f"%m/%d/%Y %a %I:%M %p ({tz_label})")
     return timestamp
 
 def send_email(ses_client, region, sender, recipient):

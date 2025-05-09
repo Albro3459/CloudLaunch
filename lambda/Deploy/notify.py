@@ -1,10 +1,9 @@
-import base64
-
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from email.mime.application import MIMEApplication
 
 from config_helper import get_config, build_QR_code
@@ -13,10 +12,10 @@ def get_timestamp():
     central = ZoneInfo("America/Chicago")
     now = datetime.now(central)
     tz_label = now.tzname()
-    timestamp = now.strftime(f"%m/%d/%Y %a %I:%M:%S %p ({tz_label})")
+    timestamp = now.strftime(f"%m/%d/%Y %a %I:%M %p ({tz_label})")
     return timestamp
 
-def send_VPN_email(ses_client, region, sender, recipient, ip_address, config, qr_code=""):
+def send_VPN_email(ses_client, region, sender, recipient, ip_address, config, qr_code):
     timestamp = get_timestamp()
 
     subject = f"VPN is now live in {region}!"
@@ -38,15 +37,16 @@ def send_VPN_email(ses_client, region, sender, recipient, ip_address, config, qr
     body = MIMEText(body_text, 'plain')
     msg.attach(body)
 
-    # Attachment (WireGuard config as a file)
+    # WireGuard config
     part = MIMEApplication(config.encode('utf-8'))
     part.add_header('Content-Disposition', 'attachment', filename='wireguard.conf')
     msg.attach(part)
 
-    # Optionally: attach QR code as another file (if you wanted to)
-    # qr_part = MIMEApplication(qr_code.encode('utf-8'))
-    # qr_part.add_header('Content-Disposition', 'attachment', filename='qrcode.txt')
-    # msg.attach(qr_part)
+    # QR code
+    img = MIMEImage(qr_code, name='qrcode.png')
+    img.add_header('Content-ID', '<qrcode_image>')
+    img.add_header('Content-Disposition', 'inline', filename='qrcode.png')
+    msg.attach(img)
 
     try:
         response = ses_client.send_email(
