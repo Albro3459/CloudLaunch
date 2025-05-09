@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/CloudLaunch/static/css/main.64df9292.css",
-    "main.js": "/CloudLaunch/static/js/main.acdaad56.js",
+    "main.css": "/CloudLaunch/static/css/main.cacd554f.css",
+    "main.js": "/CloudLaunch/static/js/main.fa8145e8.js",
     "index.html": "/CloudLaunch/index.html",
-    "main.64df9292.css.map": "/CloudLaunch/static/css/main.64df9292.css.map",
-    "main.acdaad56.js.map": "/CloudLaunch/static/js/main.acdaad56.js.map"
+    "main.cacd554f.css.map": "/CloudLaunch/static/css/main.cacd554f.css.map",
+    "main.fa8145e8.js.map": "/CloudLaunch/static/js/main.fa8145e8.js.map"
   },
   "entrypoints": [
-    "static/css/main.64df9292.css",
-    "static/js/main.acdaad56.js"
+    "static/css/main.cacd554f.css",
+    "static/js/main.fa8145e8.js"
   ]
 }
