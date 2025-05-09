@@ -141,15 +141,18 @@ def lambda_handler(event, context):
         print(f"Unauthorized role: {role}")
         return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
     
+    
+    print(f"WAITER requested with {wait_type}, {region}, {email}")
+    
 
     if wait_type.lower() == "vpn":
         instance_name = body.get("instance_name", "").strip()
-        email = body.get("email", "").strip()
+        print(f"VPN Instance ID: {instance_name}, Email: {email}, Region: {region}")
         if not instance_name or not email:
-            print("Missing instance name or email parameters.")
+            print("Missing instance name parameter.")
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": f"Missing required parameters: {instance_name}, {email}"})
+                "body": json.dumps({"error": f"Missing required parameter: {instance_name}"})
             }
         
         ip_address = check_for_vpn(instance_name, region)
@@ -177,9 +180,12 @@ def lambda_handler(event, context):
                 "statusCode": 400,
                 "body": json.dumps({"error": f"Failed to generate QR code."})
             }
-        
+            
+            
         emails = [email]
-        emails.append(RECIPIENT)
+        if email != RECIPIENT:
+            emails.append(RECIPIENT)
+            
         ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
         for recipient in emails:
             if not send_VPN_email(ses_client, region, SENDER, recipient, ip_address, config, qr_code):

@@ -15,6 +15,7 @@ def send_waiter_request(region, instance_name, email, request_url, token):
         "email": email,
         "region": region
     }
+    print(f"DEPLOY sending Waiter request with {payload}")
     try:
         response = requests.post(
             request_url, 
