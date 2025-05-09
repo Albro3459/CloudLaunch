@@ -34,9 +34,7 @@ def get_available_instance_name(ec2, instance_name):
     return None
 
 # Check if Image exists in the target region
-def check_image_exists(target_region, image_id):
-    ec2 = boto3.client("ec2", region_name=target_region)
-
+def check_image_exists(ec2, target_region, image_id):
     try:
         response = ec2.describe_images(
             Owners=["self"],
@@ -59,9 +57,8 @@ def check_image_exists(target_region, image_id):
         print(f"Unexpected response format when checking Image in {target_region}.")
         return f"Error checking Image in {target_region}"
 
-def deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, KeyName):
+def deploy_instance(ec2, target_region, image_id, instance_name, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
-    ec2 = boto3.client("ec2", region_name=target_region)
     
     instanceName = get_available_instance_name(ec2, instance_name)
     if not instanceName:

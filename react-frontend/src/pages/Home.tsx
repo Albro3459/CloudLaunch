@@ -14,7 +14,8 @@ const Home: React.FC = () => {
     const [region, setRegion] = useState("");
     const [terraformRegion, setTerraformRegion] = useState("");
     const [cleanRegion, setCleanRegion] = useState("");
-    // const [instanceName, setInstanceName] = useState("");
+
+    const [email, setEmail] = useState<string | null>(null);
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ const Home: React.FC = () => {
                 console.error("Error: JWT token not found");
             }
             else {
-                const response = await VPNdeployHelper(region, jwtToken);
+                const response = await VPNdeployHelper(region, email || "", jwtToken);
             
                 setLoading(false);
 
@@ -145,6 +146,7 @@ const Home: React.FC = () => {
             const fetchUserData = async () => {
                 if (user) {
                     setRole(await getUserRole(user));
+                    setEmail(user.email);
                     try {
                         const token = await getIdToken(user);
                         setJwtToken(token);

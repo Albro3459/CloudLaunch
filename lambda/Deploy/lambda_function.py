@@ -5,8 +5,11 @@ from vpn_manager import check_image_exists, deploy_instance, shutdown_all_other_
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
 from firebase import get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
+from notify import deliver_emails
 
 CLEANUP_VPNS = True
+SOURCE_REGION = "us-west-1"
+SENDER="brodsky.alex22@gmail.com"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -33,15 +36,15 @@ def lambda_handler(event, context):
     # Extract required values
     target_region = body.get("region", "").strip()
     instance_name = body.get("instance_name", "").strip()
+    email = body.get("email", "").strip()
 
     # Validate input
     if not instance_name or len(instance_name) == 0:
         instance_name = "VPN"
-    if not target_region or not token or \
-        len(target_region) == 0 or len(token) == 0:
+    if not target_region or not email or not token:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {target_region}"})
+            "body": json.dumps({"error": f"Missing required parameters: {target_region}, {email}"})
         }
 
     # Fetch secrets
@@ -92,9 +95,12 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "Missing required secret values"})
         }
+    
+    
+    ec2 = boto3.client("ec2", region_name=target_region)
 
     # Check if Image exists
-    image_id = check_image_exists(target_region, vpn_image_id)
+    image_id = check_image_exists(ec2, target_region, vpn_image_id)
     if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
         return {
             "statusCode": 500,
@@ -105,8 +111,8 @@ def lambda_handler(event, context):
     if CLEANUP_VPNS:
         shutdown_all_other_instances(live_regions)
 
-    # Deploy the EC2 instance
-    result = deploy_instance(target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
+    # Deploy the EC2 instance        
+    result = deploy_instance(ec2, target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
     if not result:
         return {
             "statusCode": 500,
@@ -124,6 +130,14 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve instance ID"})
         }
+        
+    # Send emails
+    ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
+    emails = [email]
+    if email != SENDER:
+        emails.append(SENDER)
+    
+    deliver_emails(ses_client, client_private_key, server_public_key, public_ip, target_region, SENDER, emails)
 
     return {
         "statusCode": 200,

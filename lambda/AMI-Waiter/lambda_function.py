@@ -129,6 +129,10 @@ def lambda_handler(event, context):
         sent_email = send_email(ses_client, region, SENDER, RECIPIENT)
         if not sent_email:
             print("Email failed to send")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f"Failed to send email."})
+            }
         
         return {
             "statusCode": 200,
