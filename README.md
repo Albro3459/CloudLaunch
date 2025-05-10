@@ -2,7 +2,7 @@
 
 * Check out the quick demo on [YouTube](https://youtu.be/Zpeojm-HI8g)
 
-* The website is live at: [https://albro3459.github.io/CloudLaunch](https://albro3459.github.io/CloudLaunch)
+* The website is live at: [cloudlaunch.live/](https://www.cloudlaunch.live/)
 
   * Only the admin account is active for the time being.
  
