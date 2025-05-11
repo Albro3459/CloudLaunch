@@ -2,13 +2,15 @@ import time
 import boto3
 from botocore.exceptions import ClientError
 
-def get_available_instance_name(ec2, instance_name):
+from firebase import add_instance_to_firebase, batch_update_all_users_instances
+
+def get_available_instance_name(ec2, user_id):
     """
-    Checks if an instance with the given base_name exists in that ec2 region.
-    If it does, appends -1 to -15 to find an available name.
-    Returns an available name or None if all 15 are taken.
+    Find an available instance name
     """
     existing_names = set()
+    
+    instance_name = "VPN-" + user_id
     
     # Get all instances with 'instance_name'
     response = ec2.describe_instances(
@@ -20,18 +22,20 @@ def get_available_instance_name(ec2, instance_name):
             for tag in instance.get("Tags", []):
                 if tag["Key"] == "Name":
                     existing_names.add(tag["Value"])
-
-    # Try base name first
-    if instance_name not in existing_names and instance_name != "VPN":
-        return instance_name
-
-    # Try appending -1 to -50
-    for i in range(1, 50):
-        new_name = f"{instance_name}-{i}"
-        if new_name not in existing_names:
-            return new_name
-
-    return None
+                    
+    # Find the largest number and add 1
+    nums = []
+    for name in existing_names:
+        if name.startswith(instance_name + "-"):
+            try:
+                num = int(name.split("-")[-1])
+                nums.append(num)
+            except Exception:
+                continue  # ignore non-numbers
+              
+    num = max(nums) + 1 if len(nums) >= 1 else 1
+    
+    return f"{instance_name}-{num}"
 
 # Check if Image exists in the target region
 def check_image_exists(ec2, target_region, image_id):
@@ -57,12 +61,17 @@ def check_image_exists(ec2, target_region, image_id):
         print(f"Unexpected response format when checking Image in {target_region}.")
         return f"Error checking Image in {target_region}"
 
-def deploy_instance(ec2, target_region, image_id, instance_name, security_group_id, subnet_id, KeyName):
+def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
     
-    instanceName = get_available_instance_name(ec2, instance_name)
+    # TODO make sure there are no running instances in the region for that user
+        # if there are, just return that instance ID and name
+    
+    instanceName = get_available_instance_name(ec2, user_id)
     if not instanceName:
-        return {"error": "All name variations are taken. Choose a different base name."}
+        # This will probably never get hit
+        print("No VPN name available.")
+        return None
 
     try:
         response = ec2.run_instances(
@@ -97,6 +106,8 @@ def deploy_instance(ec2, target_region, image_id, instance_name, security_group_
                 public_ip = instance.get("PublicIpAddress")
                 if public_ip:
                     print(f"Instance {instance_id} has public IP: {public_ip}")
+                    # Save the instance to firebase
+                    add_instance_to_firebase(user_id, instance_id, instanceName)
                     return instance_id, public_ip
             print("Waiting for public IP assignment...")
             time.sleep(interval)
@@ -114,11 +125,13 @@ def deploy_instance(ec2, target_region, image_id, instance_name, security_group_
         print(f"Unexpected error launching instance: {e}")
         return None
     
-def shutdown_all_other_instances(LIVE_REGIONS):
+## Clean up
+def terminate_all_other_instances(LIVE_REGIONS):
     for region in [r["value"] for r in LIVE_REGIONS]:
         ec2 = boto3.resource("ec2", region_name=region)
         print(f"Checking region: {region}")
         terminate_old_vpn_instances(ec2)
+    batch_update_all_users_instances("terminated")
     
     
 def terminate_old_vpn_instances(ec2):

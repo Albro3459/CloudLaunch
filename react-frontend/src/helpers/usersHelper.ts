@@ -53,7 +53,6 @@ export const getUserRole = async (user: User): Promise<string | null> => {
   
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // console.log(data.role);
         return data.role || null;
       }
   

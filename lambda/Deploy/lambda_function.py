@@ -1,7 +1,7 @@
 import json
 import boto3
 
-from vpn_manager import check_image_exists, deploy_instance, shutdown_all_other_instances
+from vpn_manager import check_image_exists, deploy_instance, terminate_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
 from firebase import get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
@@ -35,12 +35,9 @@ def lambda_handler(event, context):
 
     # Extract required values
     target_region = body.get("region", "").strip()
-    instance_name = body.get("instance_name", "").strip()
     email = body.get("email", "").strip()
 
     # Validate input
-    if not instance_name or len(instance_name) == 0:
-        instance_name = "VPN"
     if not target_region or not email or not token:
         return {
             "statusCode": 400,
@@ -107,12 +104,17 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": image_id})
         }
         
-    # Clean Up up other instances:
+    # Clean Up other instances:
     if CLEANUP_VPNS:
-        shutdown_all_other_instances(live_regions)
+        # Terminate all instances for all users
+        # Also update statuses for all users instances in Firestore
+        terminate_all_other_instances(live_regions)
+    else:
+        # No need to shutdown anything
+        pass
 
-    # Deploy the EC2 instance        
-    result = deploy_instance(ec2, target_region, image_id, instance_name, security_group_id, subnet_id, key_name)
+    # Deploy the EC2 instance
+    result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
     if not result:
         return {
             "statusCode": 500,
