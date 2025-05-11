@@ -20,7 +20,7 @@ def create_user(email, password):
 def create_role(uid):
     try:
         db = firestore.client()
-        db.collection("Roles").document(uid).set({"role": "user"})
+        db.collection("Users").document(uid).set({"role": "user"})
         return True
     except Exception as e:
         print("Error setting role:", e)

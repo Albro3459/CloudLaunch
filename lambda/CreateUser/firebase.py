@@ -20,7 +20,7 @@ def verify_firebase_token(token):
 def get_user_role(uid):
     try:
         db = firestore.client()
-        doc_ref = db.collection("Roles").document(uid)
+        doc_ref = db.collection("Users").document(uid)
         doc = doc_ref.get()
         if doc.exists:
             data = doc.to_dict()
