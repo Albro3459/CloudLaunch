@@ -59,7 +59,7 @@ def get_users_instances(user_id):
     try:
         db = firestore.client()
         instances_ref = db.collection("Users").document(user_id).collection("Instances")
-        query = instances_ref.where("status", "!=", "terminated")
+        query = instances_ref.where(field_path="status", op_string="!=", value="terminated")
         docs = query.stream()
 
         running_instances = []

@@ -128,7 +128,7 @@ def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, su
 ## Clean up
 def terminate_all_other_instances(LIVE_REGIONS):
     for region in [r["value"] for r in LIVE_REGIONS]:
-        ec2 = boto3.resource("ec2", region_name=region)
+        ec2 = boto3.client("ec2", region_name=region)
         print(f"Checking region: {region}")
         terminate_old_vpn_instances(ec2)
     batch_update_all_users_instances("terminated")
@@ -140,13 +140,16 @@ def terminate_old_vpn_instances(ec2):
         {"Name": "tag:Name", "Values": ["VPN-*"]}
     ]
 
-    instances_to_terminate = []
-    for instance in ec2.instances.filter(Filters=filters):
-        print(f"Marking for termination: {instance.id} ({instance.public_ip_address})")
-        instances_to_terminate.append(instance.id)
+    response = ec2.describe_instances(Filters=filters)
 
-    if instances_to_terminate:
-        ec2.instances.filter(InstanceIds=instances_to_terminate).terminate()
-        print(f"Terminated instances: {instances_to_terminate}")
+    instance_ids = [
+        instance["InstanceId"]
+        for reservation in response["Reservations"]
+        for instance in reservation["Instances"]
+    ]
+
+    if instance_ids:
+        print(f"Terminating instances: {instance_ids}")
+        ec2.terminate_instances(InstanceIds=instance_ids)
     else:
         print("No other instances to terminate.")
