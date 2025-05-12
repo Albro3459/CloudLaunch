@@ -10,8 +10,8 @@ from firebase import initialize_firebase, is_region_live, update_live_regions, v
 from notify import send_email
 
 SOURCE_REGION = "us-west-1"
-SENDER="brodsky.alex22@gmail.com"
-RECIPIENT="brodsky.alex22@gmail.com"
+SENDER="CloudLaunch <noreply@cloudlaunch.live>"
+ADMIN="brodsky.alex22@gmail.com"
 
 # Waits until AMI is live and sets the region to live in Firebase
 
@@ -126,7 +126,7 @@ def lambda_handler(event, context):
         print(f"AMI ID: {ami_id} ready in Region: {region}")
         
         ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
-        sent_email = send_email(ses_client, region, SENDER, RECIPIENT)
+        sent_email = send_email(ses_client, region, SENDER, ADMIN)
         if not sent_email:
             print("Email failed to send")
             return {

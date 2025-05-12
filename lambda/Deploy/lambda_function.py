@@ -9,7 +9,8 @@ from notify import deliver_emails
 
 CLEANUP_VPNS = True
 SOURCE_REGION = "us-west-1"
-SENDER="brodsky.alex22@gmail.com"
+SENDER="CloudLaunch <noreply@cloudlaunch.live>"
+ADMIN="brodsky.alex22@gmail.com"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -136,8 +137,8 @@ def lambda_handler(event, context):
     # Send emails
     ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
     emails = [email]
-    if email != SENDER:
-        emails.append(SENDER)
+    if email != ADMIN:
+        emails.append(ADMIN)
     
     deliver_emails(ses_client, client_private_key, server_public_key, public_ip, target_region, SENDER, emails)
 

@@ -12,10 +12,9 @@ def send_email(ses_client, region, sender, recipient):
     # Get current time in UTC with timezone info
     timestamp = get_timestamp()
     
-    subject = f"Region {region} is now live!"
+    subject = f"Region {region} is live!"
     body_text = (
-        f"From CloudLaunch,\n\n"
-        f"The WireGuard AMI is now live in: {region}\n\n"
+        f"The WireGuard AMI is live in: {region}\n\n"
         f"Timestamp: {timestamp}\n\n"
         f"Enjoy!"
     )

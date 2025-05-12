@@ -18,10 +18,9 @@ def get_timestamp():
 def send_VPN_email(ses_client, region, sender, recipient, ip_address, config, qr_code):
     timestamp = get_timestamp()
 
-    subject = f"VPN is now live in {region}!"
+    subject = f"VPN is live in {region}!"
     body_text = (
-        f"From CloudLaunch,\n\n"
-        f"The WireGuard VPN is now live in: {region}\n\n"
+        f"Your VPN is live in: {region}\n\n"
         f"IPv4: {ip_address}\n\n"
         f"Timestamp: {timestamp}\n\n"
         f"Enjoy!"
