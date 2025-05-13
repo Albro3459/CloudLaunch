@@ -58,65 +58,106 @@ def get_live_regions():
 def get_users_instances(user_id):
     try:
         db = firestore.client()
-        instances_ref = db.collection("Users").document(user_id).collection("Instances")
-        query = instances_ref.where(field_path="status", op_string="!=", value="terminated")
-        docs = query.stream()
+        regions_ref = db.collection("Users").document(user_id).collection("Regions")
+        regions = regions_ref.stream()
 
-        running_instances = []
-        for doc in docs:
-            instance = doc.to_dict()
-            instance["id"] = doc.id
-            running_instances.append(instance)
+        region_instances_map = {}
 
-        return running_instances
+        for region_doc in regions:
+            region_id = region_doc.id
+            instances_ref = regions_ref.document(region_id).collection("Instances")
+            query = instances_ref.where("status", "!=", "terminated")
+            docs = query.stream()
+
+            instances = []
+            for doc in docs:
+                data = doc.to_dict()
+                instance = {
+                    "id": doc.id,
+                    "name": data.get("name"),
+                    "status": data.get("status"),
+                    "createdAt": data.get("createdAt"),
+                    "ipv4": data.get("ipv4")
+                }
+                instances.append(instance)
+
+            if instances:
+                region_instances_map[region_id] = instances
+
+        return region_instances_map
     except Exception as e:
         print(f"Error fetching running instances for user {user_id}: {e}")
-        return []
+        return {}
+
 
     
-def add_instance_to_firebase(uid, instance_id, instanceName):
+def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
     try:
         db = firestore.client()
-        instance_ref = db.collection("Users").document(uid).collection("Instances").document(instance_id)
+        instance_ref = (
+            db.collection("Users")
+                .document(uid)
+              .collection("Regions")
+                .document(region)
+              .collection("Instances")
+              . document(instance_id)
+        )
         
         instance_data = {
-            "name": f"{instanceName}",
-            "status": "running",
-            "createdAt": datetime.now(timezone.utc).isoformat()
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "ipv4": ipv4,
+            "name": instanceName,
+            "status": "running"
         }
         
         instance_ref.set(instance_data)
-        print(f"Instance {instance_id} saved for user {uid}.")
+        print(f"Instance {instance_id} saved for user {uid} in region {region}.")
     except Exception as e:
         print(f"Error saving instance: {e}")
         
-def update_instance_status(uid, instance_id, status):
+def update_instance_status(uid, region, instance_id, status):
     try:
         db = firestore.client()
-        instance_ref = db.collection("Users").document(uid).collection("Instances").document(instance_id)
-        
-        instance_data = {
-            "status": status,
-        }
-        
-        instance_ref.update(instance_data)
-        print(f"Instance {instance_id} updated for user {uid}.")
+        instance_ref = (
+            db.collection("Users")
+                .document(uid)
+              .collection("Regions")
+                .document(region)
+              .collection("Instances")
+              . document(instance_id)
+        )   
+             
+        instance_ref.update({"status": status})
+        print(f"Instance {instance_id} in region {region} updated for user {uid}.")
     except Exception as e:
-        print(f"Error saving instance: {e}")
+        print(f"Error updating instance status: {e}")
         
-def batch_update_instance_statuses(uid, instance_ids, status):
+def batch_update_instance_statuses(uid, region_instance_map, status):
+    """
+    region_instance_map in the form: { "us-east1": ["i-1", "i-2"], "eu-west1": ["i-3"] }
+    """
     try:
         db = firestore.client()
         batch = db.batch()
 
-        for instance_id in instance_ids:
-            ref = db.collection("Users").document(uid).collection("Instances").document(instance_id)
-            batch.update(ref, {"status": status})
+        for region, instance_ids in region_instance_map.items():
+            instances_ref = (
+                db.collection("Users")
+                    .document(uid)
+                  .collection("Regions")
+                    .document(region)
+                  .collection("Instances")
+            )
+
+            for instance_id in instance_ids:
+                ref = instances_ref.document(instance_id)
+                batch.update(ref, {"status": status})
 
         batch.commit()
-        print(f"Batch updated status to '{status}' for instances: {instance_ids}")
+        print(f"Batch updated status to '{status}' for instances in: {region_instance_map}")
     except Exception as e:
         print(f"Error in batch update: {e}")
+
         
 def batch_update_all_users_instances(status="terminated"):
     try:
@@ -124,12 +165,17 @@ def batch_update_all_users_instances(status="terminated"):
         users = db.collection("Users").stream()
 
         for user in users:
-            instances = get_users_instances(user.id)
-            instance_ids = [inst["id"] for inst in instances]
+            region_instances = get_users_instances(user.id)
             
-            if instance_ids:
-                print(f"Updating {len(instance_ids)} instances for user {user.id}")
-                batch_update_instance_statuses(user.id, instance_ids, status)
+            # Map to ids
+            region_instance_map = {
+                region: [instance["id"] for instance in instances]
+                for region, instances in region_instances.items()
+            }
+            
+            if region_instance_map:
+                print(f"Updating {len(region_instance_map)} instances for user {user.id}")
+                batch_update_instance_statuses(user.id, region_instance_map, status)
             else:
                 print(f"No active instances to update for user {user.id}")
     except Exception as e:

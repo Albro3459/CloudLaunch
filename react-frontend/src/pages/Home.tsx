@@ -2,9 +2,13 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
-import { aws_regions, getLiveRegions, Region } from "../helpers/regionsHelper";
+import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
+
+import VPNTable, { VPNTableEntry } from "../components/VPNTable";
+import { getUsersVPNs, VPNData } from "../helpers/firebaseDbHelper";
+import { User } from "firebase/auth";
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
@@ -21,6 +25,32 @@ const Home: React.FC = () => {
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    // const VPNData = [
+    //     {
+    //         region: getRegionName("us-west-1")!,
+    //         ipv4: "127.0.0.1",
+    //         status: "Running",
+    //         onQrCodeClick: () => {},
+    //         onDownloadClick: () => {}
+    //     },
+    //     {
+    //         region: "us-west-1",
+    //         ipv4: "127.0.0.1",
+    //         status: "Running",
+    //         onQrCodeClick: () => {},
+    //         onDownloadClick: () => {}
+    //     },
+    //     {
+    //         region: getRegionName("us-east-2")!,
+    //         ipv4: "127.0.0.1",
+    //         status: "Running",
+    //         onQrCodeClick: () => {},
+    //         onDownloadClick: () => {}
+    //     }
+    // ];
+
+    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);    
     
     const handleDeploySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -42,9 +72,9 @@ const Home: React.FC = () => {
 
                 const { public_ipv4, client_private_key, server_public_key } = response.data;
 
-                navigate("/Success", {
+                navigate("/VPNSuccess", {
                     replace: true,
-                    state: { instanceName: null, region: region, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+                    state: { instanceName: null, region: getRegionName(region), ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
                 });
             }
 
@@ -79,7 +109,7 @@ const Home: React.FC = () => {
 
                 navigate("/terraformSuccess", {
                     replace: true,
-                    state: { region: target_region }
+                    state: { region: getRegionName(target_region) }
                 });
             }
 
@@ -114,7 +144,7 @@ const Home: React.FC = () => {
 
                 navigate("/cleanSuccess", {
                     replace: true,
-                    state: { region: region_cleaned }
+                    state: { region: getRegionName(region_cleaned) }
                 });
             }
 
@@ -129,6 +159,15 @@ const Home: React.FC = () => {
             navigate("/CreateUser", { replace: true });
         }
     }
+
+    const fillVPNs = async (user: User) => {
+        const VPNs: VPNData[] = await getUsersVPNs(user);
+        setVPNTableEntries(VPNs.map((vpn) => ({
+            ...vpn,
+            onQrCodeClick: () => {},
+            onDownloadClick: () => {}
+        })))
+    };
 
     useEffect(() => {
         const fetchLiveRegions = async () => {
@@ -147,6 +186,7 @@ const Home: React.FC = () => {
                 if (user) {
                     setRole(await getUserRole(user));
                     setEmail(user.email);
+                    await fillVPNs(user);
                     try {
                         const token = await getIdToken(user);
                         setJwtToken(token);
@@ -265,86 +305,92 @@ const Home: React.FC = () => {
                 </form>
             </div>
 
-                { /* ADMIN ONLY */ }
-                {role && role === "admin" &&
-                <>
-                    <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
-                        <h2 className="text-2xl font-semibold text-center mb-6">Terraform New Region</h2>
+            { /* ADMIN ONLY */ }
+            {role && role === "admin" &&
+            <>
+                <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
+                    <h2 className="text-2xl font-semibold text-center mb-6">Terraform New Region</h2>
 
-                        <form onSubmit={async (e) => { await handleTerraformSubmit(e); }}>
-                            {/* AWS Region Dropdown */}
-                            <div className="mb-6">
-                                <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
-                                <select
-                                value={terraformRegion}
-                                onChange={(e) => setTerraformRegion(e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                required
-                                >
-                                <option value="">Select a region</option>
-                                {liveRegions && liveRegions.length > 0 &&
-                                aws_regions.filter((region) => !liveRegions.map((r) => r.value).includes(region.value))
-                                    .map((region) => (
-                                        <option key={region.value} value={region.value}>
-                                            {region.name}
-                                        </option>
-                                    ))
-                                }
-                                </select>
-                            </div>
-                            {/* Submit Button */}
-                            <button
-                                type="submit"
-                                disabled={!terraformRegion}
-                                className={`w-full p-3 rounded-lg transition ${
-                                    terraformRegion 
-                                    ? "cursor-pointer bg-green-600 text-white hover:bg-green-700"
-                                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                }`}
+                    <form onSubmit={async (e) => { await handleTerraformSubmit(e); }}>
+                        {/* AWS Region Dropdown */}
+                        <div className="mb-6">
+                            <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
+                            <select
+                            value={terraformRegion}
+                            onChange={(e) => setTerraformRegion(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            required
                             >
-                                Terraform Region
-                            </button>
-                        </form>
-                    </div>
-                    <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
-                        <h2 className="text-2xl font-semibold text-center mb-6">Clean Region</h2>
-                        <form onSubmit={async (e) => { await handleTerraformClean(e); }}>
-                            {/* AWS Region Dropdown */}
-                            <div className="mb-6">
-                                <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
-                                <select
-                                value={cleanRegion}
-                                onChange={(e) => setCleanRegion(e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                required
-                                >
-                                <option value="">Select a region</option>
-                                {liveRegions && liveRegions.length > 0 &&
-                                liveRegions.filter((region) => region.value !== SOURCE_REGION)
-                                    .map((region) => (
-                                        <option key={region.value} value={region.value}>
-                                            {region.name}
-                                        </option>
-                                    ))
-                                }
-                                </select>
-                            </div>
-                            {/* Submit Button */}
-                            <button
-                                type="submit"
-                                disabled={!cleanRegion}
-                                className={`w-full p-3 rounded-lg transition ${
-                                    cleanRegion 
-                                    ? "cursor-pointer bg-red-600 text-white hover:bg-red-700"
-                                    : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                }`}
+                            <option value="">Select a region</option>
+                            {liveRegions && liveRegions.length > 0 &&
+                            aws_regions.filter((region) => !liveRegions.map((r) => r.value).includes(region.value))
+                                .map((region) => (
+                                    <option key={region.value} value={region.value}>
+                                        {region.name}
+                                    </option>
+                                ))
+                            }
+                            </select>
+                        </div>
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={!terraformRegion}
+                            className={`w-full p-3 rounded-lg transition ${
+                                terraformRegion 
+                                ? "cursor-pointer bg-green-600 text-white hover:bg-green-700"
+                                : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            }`}
+                        >
+                            Terraform Region
+                        </button>
+                    </form>
+                </div>
+                <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
+                    <h2 className="text-2xl font-semibold text-center mb-6">Clean Region</h2>
+                    <form onSubmit={async (e) => { await handleTerraformClean(e); }}>
+                        {/* AWS Region Dropdown */}
+                        <div className="mb-6">
+                            <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
+                            <select
+                            value={cleanRegion}
+                            onChange={(e) => setCleanRegion(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            required
                             >
-                                Clean Region
-                            </button>
-                        </form>
-                    </div>
-                </>
-                }
+                            <option value="">Select a region</option>
+                            {liveRegions && liveRegions.length > 0 &&
+                            liveRegions.filter((region) => region.value !== SOURCE_REGION)
+                                .map((region) => (
+                                    <option key={region.value} value={region.value}>
+                                        {region.name}
+                                    </option>
+                                ))
+                            }
+                            </select>
+                        </div>
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            disabled={!cleanRegion}
+                            className={`w-full p-3 rounded-lg transition ${
+                                cleanRegion 
+                                ? "cursor-pointer bg-red-600 text-white hover:bg-red-700"
+                                : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            }`}
+                        >
+                            Clean Region
+                        </button>
+                    </form>
+                </div>
+            </>
+            }
+
+            <VPNTable
+                data={VPNTableEntries}
+                isAdmin={true}
+                onStatusChange={(index, newStatus) => {}}
+            />
 
             {/* Loading Overlay (Blocks clicks and dims background) */}
             {loading && (

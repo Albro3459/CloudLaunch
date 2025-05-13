@@ -20,6 +20,7 @@
     "@types/react-dom": "^19.0.4",
     "file-saver": "^2.0.5",
     "firebase": "^11.5.0",
+    "lucide-react": "^0.510.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

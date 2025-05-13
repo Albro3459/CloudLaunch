@@ -7,7 +7,7 @@ import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { saveAs } from "file-saver";
 import { auth, onAuthStateChanged, signOut } from "../firebase";
 
-interface SuccessState {
+interface VPNSuccessState {
     instanceName: string | null;
     region: string | null;
     ip: string | null;
@@ -15,7 +15,7 @@ interface SuccessState {
     server_public_key: string | null;
   }
 
-const Success: React.FC = () => {
+const VPNSuccess: React.FC = () => {
     const navigate = useNavigate();
 
     const location = useLocation();
@@ -25,7 +25,7 @@ const Success: React.FC = () => {
         ip,
         client_private_key, 
         server_public_key
-    } = (location.state || {}) as Partial<SuccessState>;
+    } = (location.state || {}) as Partial<VPNSuccessState>;
     
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -97,11 +97,11 @@ const Success: React.FC = () => {
 
                 {ip && ip.length > 0 ? (
                     <p className="text-gray-700">
-                    Instance{" "}
+                    VPN{" "}
                     {instanceName && instanceName.length > 0 && <b>{instanceName}</b>} has been deployed in <b>{region}</b>.
                     </p>
                 ) : (
-                    <p className="text-gray-700">No instance was deployed.</p>
+                    <p className="text-gray-700">No VPN was deployed.</p>
                 )}
 
                 {ip && ip.length > 0 && (
@@ -128,4 +128,4 @@ const Success: React.FC = () => {
     );
 };
 
-export default Success;
+export default VPNSuccess;

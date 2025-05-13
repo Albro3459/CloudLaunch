@@ -107,7 +107,7 @@ def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, su
                 if public_ip:
                     print(f"Instance {instance_id} has public IP: {public_ip}")
                     # Save the instance to firebase
-                    add_instance_to_firebase(user_id, instance_id, instanceName)
+                    add_instance_to_firebase(user_id, target_region, instance_id, public_ip, instanceName)
                     return instance_id, public_ip
             print("Waiting for public IP assignment...")
             time.sleep(interval)
