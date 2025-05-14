@@ -1,10 +1,11 @@
 import { User } from "firebase/auth";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, getDocs, getDoc, doc } from "firebase/firestore";
 
 import { getUserRole } from "./usersHelper";
 import { getRegionName } from "./regionsHelper";
 
 export type VPNData = {
+    user: string | null;
     region: string | null;
     ipv4: string;
     status: string;
@@ -29,11 +30,14 @@ export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
 
             instanceSnapshots.forEach((instanceDoc) => {
                 const { ipv4, status } = instanceDoc.data();
-                vpnData.push({
-                    region: getRegionName(regionId),
-                    ipv4: ipv4,
-                    status: status,
-                });
+                if (status.toLowerCase() !== "terminated") {
+                    vpnData.push({
+                        user: user.email,
+                        region: getRegionName(regionId),
+                        ipv4: ipv4,
+                        status: status,
+                    });
+                }
             });
         }
 
@@ -48,16 +52,19 @@ export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
 const getAdminVPNs = async (): Promise<VPNData[]> => {
     return [
             {
+                user: "brodsky.alex22@gmail.com",
                 region: getRegionName("us-west-1")!,
                 ipv4: "127.0.0.1",
                 status: "Running",
             },
             {
+                user: "brodsky.alex22@gmail.com",
                 region: "us-west-1",
                 ipv4: "127.0.0.1",
                 status: "Running",
             },
             {
+                user: "brodsky.alex22@gmail.com",
                 region: getRegionName("us-east-2")!,
                 ipv4: "127.0.0.1",
                 status: "Running",

@@ -69,4 +69,3 @@ export const getUserRole = async (user: User): Promise<string | null> => {
       return null;
     }
 };
-  

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Download, QrCode } from "lucide-react";
 
 export type VPNTableEntry = {
+    user: string | null;
     region: string | null;
     ipv4: string;
     status: string;
@@ -13,6 +14,10 @@ type VPNTableData = {
     data: VPNTableEntry[];
     isAdmin: boolean;
     onStatusChange?: (index: number, newStatus: string) => void;
+};
+
+const capitalized = (str: string) => {
+    return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
 const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => {
@@ -36,6 +41,9 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
                 <table className="min-w-full text-sm text-left text-gray-700">
                     <thead className="border-b border-gray-200 text-gray-900">
                         <tr>
+                            {isAdmin &&
+                                <th className="px-4 py-2">User</th>
+                            }
                             <th className="px-4 py-2">Region</th>
                             <th className="px-4 py-2">Address</th>
                             <th className="px-4 py-2">Status</th>
@@ -45,9 +53,12 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
                     <tbody>
                         {data.map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                                {isAdmin &&
+                                    <td className="px-4 py-2">{entry.user || "Null"}</td>
+                                }
                                 <td className="px-4 py-2">{entry.region || "Null"}</td>
                                 <td className="px-4 py-2">{entry.ipv4}</td>
-                                <td className="px-4 py-2">{entry.status}</td>
+                                <td className="px-4 py-2">{capitalized(entry.status)}</td>
                                 <td className="px-4 py-2 flex justify-center space-x-4">
                                     {isAdmin ? (
                                         <select
@@ -56,7 +67,7 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
                                             }
                                             className="p-2 border rounded-lg focus:ring-blue-500 focus:outline-none"
                                         >
-                                            <option value="" selected>{actionOptions[entry.status]}</option>
+                                            <option value="" selected>{actionOptions[capitalized(entry.status)]}</option>
                                             {Object.entries(actionOptions).map(([status, action]) => {
                                                 return status.toLowerCase() !== entry.status.toLowerCase() &&
                                                     <option 

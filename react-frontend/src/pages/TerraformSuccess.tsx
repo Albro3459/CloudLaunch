@@ -61,8 +61,8 @@ const TerraformSuccess: React.FC = () => {
 
                 {region && region.length > 0 ? (
                     <p className="text-gray-700">
-                        Region{" "}
                         { <b>{region}</b>} is being terraformed for deployment.
+                        <br></br>
                         <br></br>
                         { <b>Be Patient: </b>}this process can take 5 - 10 minutes.
                     </p>

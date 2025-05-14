@@ -94,14 +94,16 @@ def get_users_instances(user_id):
 def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
     try:
         db = firestore.client()
-        instance_ref = (
+        region_ref = (
             db.collection("Users")
                 .document(uid)
-              .collection("Regions")
+            .collection("Regions")
                 .document(region)
-              .collection("Instances")
-              . document(instance_id)
-        )
+        ) 
+        # Ensure region doc exists with at least one field (otherwise firebase does weird stuff like saying a subcollection doesn't exist when it does)
+        region_ref.set({"created": firestore.SERVER_TIMESTAMP}, merge=True)
+        
+        instance_ref = region_ref.collection("Instances").document(instance_id)
         
         instance_data = {
             "createdAt": datetime.now(timezone.utc).isoformat(),
