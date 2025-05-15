@@ -51,9 +51,10 @@ def lambda_handler(event, context):
     # Validate input
     if not email or not password or not token or \
         len(email) == 0 or len(password) == 0 or len(token) == 0:
+        print(f"Missing required parameters: {email}")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {email}"})
+            "body": json.dumps({"error": f"Missing required parameters"})
         }
 
     # Fetch secrets
@@ -78,12 +79,16 @@ def lambda_handler(event, context):
     
     uuid = create_auth_user(email, password)
     if not uuid:
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user: {email}"})}
+        print(f"Failed to create user: {email}")
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user"})}
     success = create_firestore_user(uuid, email)
     if not success:
         if uuid == auth.EmailAlreadyExistsError:
-            return {"statusCode": 403, "body": json.dumps({"error": f"Error: Account already exists for user: {email}"})}
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user: {email}"})}
+            print(f"Error: Account already exists for user: {email}")
+            return {"statusCode": 403, "body": json.dumps({"error": f"Error: Account already exists for user"})}
+        
+        print(f"Failed to create role for user: {email}")
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user"})}
 
     return {
         "statusCode": 200,
