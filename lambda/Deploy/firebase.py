@@ -55,18 +55,24 @@ def get_live_regions():
         print(f"Error fetching live regions from Firestore: {e}")
         return []
 
-def get_users_instances(user_id):
+def get_users_instances(user_id, target_regions=None):
     try:
         db = firestore.client()
         regions_ref = db.collection("Users").document(user_id).collection("Regions")
-        regions = regions_ref.stream()
+
+        if target_regions:
+            regions = [regions_ref.document(r).get() for r in target_regions]
+        else:
+            regions = regions_ref.stream()
 
         region_instances_map = {}
 
         for region_doc in regions:
+            if not region_doc.exists:
+                continue
             region_id = region_doc.id
             instances_ref = regions_ref.document(region_id).collection("Instances")
-            query = instances_ref.where("status", "!=", "terminated")
+            query = instances_ref.where("status", "in", ["running", "stopped"]) # Live statuses
             docs = query.stream()
 
             instances = []
@@ -88,9 +94,25 @@ def get_users_instances(user_id):
     except Exception as e:
         print(f"Error fetching running instances for user {user_id}: {e}")
         return {}
-
-
     
+def get_user_instances_in_region(user_id, role, region):
+    # Returns 1+ VPNs (region_instance_map) in the requested region or None
+    if role == "admin":
+        usersIDs = get_all_user_ids()
+        
+        for uid in usersIDs:
+            region_instances_map = get_users_instances(uid, [region])
+            if region_instances_map:
+                # Just need there to be at least 1 in the region
+                return region_instances_map
+            
+        return None
+    
+    else:
+        region_instances = get_users_instances(user_id, [region])
+        return region_instances if region_instances else None
+
+
 def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
     try:
         db = firestore.client()

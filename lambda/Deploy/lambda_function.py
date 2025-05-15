@@ -3,7 +3,7 @@ import boto3
 
 from vpn_manager import check_image_exists, deploy_instance, terminate_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
-from firebase import get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
+from firebase import get_user_instances_in_region, get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 from notify import deliver_emails
 
@@ -104,15 +104,28 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": json.dumps({"error": image_id})
         }
-        
+                
+    # Make sure there are no running instances in the region for that user
+    # if there are, just return that instance ID
+    vpn = get_user_instances_in_region(user_id, role, target_region)
+    if vpn:
+        instance_ip = list(vpn.values())[0][0]["ipv4"]
+        print(f"VPN {instance_ip} already exists in region {target_region} for user {user_id}")
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "isNew": False,
+                "public_ipv4": instance_ip,
+                "client_private_key": client_private_key,
+                "server_public_key": server_public_key
+            })
+        }
+            
     # Clean Up other instances:
     if CLEANUP_VPNS:
         # Terminate all instances for all users
         # Also update statuses for all users instances in Firestore
         terminate_all_other_instances(live_regions)
-    else:
-        # No need to shutdown anything
-        pass
 
     # Deploy the EC2 instance
     result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
@@ -145,6 +158,7 @@ def lambda_handler(event, context):
     return {
         "statusCode": 200,
         "body": json.dumps({
+            "isNew": True,
             "public_ipv4": public_ip,
             "client_private_key": client_private_key,
             "server_public_key": server_public_key

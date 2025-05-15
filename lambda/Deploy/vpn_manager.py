@@ -64,9 +64,6 @@ def check_image_exists(ec2, target_region, image_id):
 def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
     
-    # TODO make sure there are no running instances in the region for that user
-        # if there are, just return that instance ID and name
-    
     instanceName = get_available_instance_name(ec2, user_id)
     if not instanceName:
         # This will probably never get hit

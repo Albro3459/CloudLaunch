@@ -26,30 +26,6 @@ const Home: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    // const VPNData = [
-    //     {
-    //         region: getRegionName("us-west-1")!,
-    //         ipv4: "127.0.0.1",
-    //         status: "Running",
-    //         onQrCodeClick: () => {},
-    //         onDownloadClick: () => {}
-    //     },
-    //     {
-    //         region: "us-west-1",
-    //         ipv4: "127.0.0.1",
-    //         status: "Running",
-    //         onQrCodeClick: () => {},
-    //         onDownloadClick: () => {}
-    //     },
-    //     {
-    //         region: getRegionName("us-east-2")!,
-    //         ipv4: "127.0.0.1",
-    //         status: "Running",
-    //         onQrCodeClick: () => {},
-    //         onDownloadClick: () => {}
-    //     }
-    // ];
-
     const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);    
     
     const handleDeploySubmit = async (e: React.FormEvent) => {
@@ -70,11 +46,11 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { public_ipv4, client_private_key, server_public_key } = response.data;
+                const { isNew, public_ipv4, client_private_key, server_public_key } = response.data;
 
                 navigate("/VPNSuccess", {
                     replace: true,
-                    state: { instanceName: null, region: getRegionName(region), ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+                    state: { region: getRegionName(region), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
                 });
             }
 

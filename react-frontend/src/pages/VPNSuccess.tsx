@@ -8,8 +8,8 @@ import { saveAs } from "file-saver";
 import { auth, onAuthStateChanged, signOut } from "../firebase";
 
 interface VPNSuccessState {
-    instanceName: string | null;
     region: string | null;
+    isNew: boolean | null;
     ip: string | null;
     client_private_key: string | null;
     server_public_key: string | null;
@@ -20,8 +20,8 @@ const VPNSuccess: React.FC = () => {
 
     const location = useLocation();
     const { 
-        instanceName,
         region,
+        isNew,
         ip,
         client_private_key, 
         server_public_key
@@ -51,7 +51,7 @@ const VPNSuccess: React.FC = () => {
     const handleDownload = () => {
         if (configData) {
             const blob = new Blob([configData], { type: "text/plain;charset=utf-8" });
-            saveAs(blob, `wg-${instanceName || "VPN"}.conf`);
+            saveAs(blob, `wireguard.conf`);
         }
     };
 
@@ -93,12 +93,30 @@ const VPNSuccess: React.FC = () => {
             </nav>
 
             <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-lg text-center">
-                <h2 className="text-2xl font-semibold mb-4">Deployment  {ip && ip.length > 0 ? "Successful 🎉" : "Failure ❌"}</h2>
+                <h2 className="text-2xl font-semibold mb-4">
+                    {isNew ? (
+                        <>
+                            Deployment  {ip && ip.length > 0 ? "Successful 🎉" : "Failure ❌"}
+                        </>
+                    ) : (
+                        <>
+                            {ip && ip.length > 0 ? "Success 🎉" : "Fail ❌"}
+                        </>
+                    )}
+                    
+                </h2>
 
                 {ip && ip.length > 0 ? (
                     <p className="text-gray-700">
-                    VPN{" "}
-                    {instanceName && instanceName.length > 0 && <b>{instanceName}</b>} has been deployed in <b>{region}</b>.
+                        {isNew ? (
+                            <>
+                                A new VPN has been deployed in <b>{region}</b>.
+                            </>
+                        ) : (
+                            <>
+                                A VPN has been found in <b>{region}</b>.
+                            </>
+                        )}
                     </p>
                 ) : (
                     <p className="text-gray-700">No VPN was deployed.</p>
