@@ -48,7 +48,7 @@ export const getUserRole = async (user: User): Promise<string | null> => {
     try {
       const uid = user.uid;
       const db = getFirestore();
-      const docRef = doc(db, "Users", uid);
+      const docRef = doc(db, "Roles", uid);
       const docSnap = await getDoc(docRef);
   
       if (docSnap.exists()) {

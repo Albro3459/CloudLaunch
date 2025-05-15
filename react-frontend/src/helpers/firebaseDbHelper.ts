@@ -1,38 +1,49 @@
 import { User } from "firebase/auth";
-import { getFirestore, collection, getDocs, getDoc, doc } from "firebase/firestore";
+import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 import { getUserRole } from "./usersHelper";
 import { getRegionName } from "./regionsHelper";
+import { auth } from "../firebase";
 
 export type VPNData = {
-    user: string | null;
+    email: string | null;
     region: string | null;
     ipv4: string;
     status: string;
 }
 
 export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
+
+    if (await getUserRole(user) === "admin") {
+        return await getAdminVPNs(user);
+    }
+
+    return await getVPNs(user.uid, user.email);
+};
+
+const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]> => {
     try {
-        if (await getUserRole(user) === "admin") {
-            return await getAdminVPNs();
+        if (!email) {
+            console.warn("Email null for user: " + userID);
+            return [];
         }
 
         const db = getFirestore();
-        const userRef = collection(db, "Users", user.uid, "Regions");
+        const userRef = collection(db, "Users", userID, "Regions");
         const regionSnapshots = await getDocs(userRef);
 
         const vpnData: VPNData[] = [];
 
         for (const regionDoc of regionSnapshots.docs) {
             const regionId = regionDoc.id;
-            const instancesRef = collection(db, "Users", user.uid, "Regions", regionId, "Instances");
+            const instancesRef = collection(db, "Users", userID, "Regions", regionId, "Instances");
             const instanceSnapshots = await getDocs(instancesRef);
 
             instanceSnapshots.forEach((instanceDoc) => {
                 const { ipv4, status } = instanceDoc.data();
-                if (status.toLowerCase() !== "terminated") {
+                if (ipv4 && status && status.toLowerCase() !== "terminated") {
                     vpnData.push({
-                        user: user.email,
+                        email: email,
                         region: getRegionName(regionId),
                         ipv4: ipv4,
                         status: status,
@@ -49,25 +60,31 @@ export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
     }
 };
 
-const getAdminVPNs = async (): Promise<VPNData[]> => {
-    return [
-            {
-                user: "brodsky.alex22@gmail.com",
-                region: getRegionName("us-west-1")!,
-                ipv4: "127.0.0.1",
-                status: "Running",
-            },
-            {
-                user: "brodsky.alex22@gmail.com",
-                region: "us-west-1",
-                ipv4: "127.0.0.1",
-                status: "Running",
-            },
-            {
-                user: "brodsky.alex22@gmail.com",
-                region: getRegionName("us-east-2")!,
-                ipv4: "127.0.0.1",
-                status: "Running",
-            }
-        ];
+const getAdminVPNs = async (user: User): Promise<VPNData[]> => {
+    try {        
+        if (await getUserRole(user) !== "admin") {
+            console.warn("Not an admin. Cannot fetch VPNs for admin.");
+            return [];
+        }
+
+        const db = getFirestore();
+        const usersSnapshot = await getDocs(collection(db, "Users"));
+
+        let vpnData: VPNData[] = [];
+
+        // for (const userDoc of usersSnapshot.docs) {
+        //     vpnData.push(...await getVPNs(userDoc.id, userDoc.data().email))
+        // }
+
+        // Same thing but this parallelizes to increase efficiency
+        vpnData = (await Promise.all(
+            usersSnapshot.docs.map(userDoc => getVPNs(userDoc.id, userDoc.data().email))
+        )).flat();
+
+        return vpnData;
+
+    } catch (error) {
+        console.warn("Error fetching VPNs for admin:", error);
+        return [];
+    }
 }

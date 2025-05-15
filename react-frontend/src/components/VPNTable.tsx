@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Download, QrCode } from "lucide-react";
 
 export type VPNTableEntry = {
-    user: string | null;
+    email: string | null;
     region: string | null;
     ipv4: string;
     status: string;
@@ -20,7 +20,7 @@ const capitalized = (str: string) => {
     return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
-const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => {
+export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => {
     const actionOptions: Record<string, string> = {
         "Running": "Start", 
         "Paused": "Pause"
@@ -54,20 +54,21 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
                         {data.map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                                 {isAdmin &&
-                                    <td className="px-4 py-2">{entry.user || "Null"}</td>
+                                    <td className="px-4 py-2">{entry.email || "Null"}</td>
                                 }
                                 <td className="px-4 py-2">{entry.region || "Null"}</td>
                                 <td className="px-4 py-2">{entry.ipv4}</td>
                                 <td className="px-4 py-2">{capitalized(entry.status)}</td>
                                 <td className="px-4 py-2 flex justify-center space-x-4">
-                                    {isAdmin ? (
+                                    {isAdmin && 
                                         <select
+                                            value={actionOptions[capitalized(entry.status)] || ""}
                                             onChange={(e) =>
                                                 onStatusChange?.(index, e.target.value)
                                             }
                                             className="p-2 border rounded-lg focus:ring-blue-500 focus:outline-none"
                                         >
-                                            <option value="" selected>{actionOptions[capitalized(entry.status)]}</option>
+                                            <option value="">{actionOptions[capitalized(entry.status)]}</option>
                                             {Object.entries(actionOptions).map(([status, action]) => {
                                                 return status.toLowerCase() !== entry.status.toLowerCase() &&
                                                     <option 
@@ -78,9 +79,7 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
                                                     </option>
                                             })}
                                         </select>
-                                    ) : (
-                                        entry.status
-                                    )}
+                                    }
                                     <button
                                         onClick={entry.onQrCodeClick}
                                         className="text-blue-600 hover:text-blue-800"
@@ -102,5 +101,3 @@ const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => 
         </div>
     );
 };
-
-export default VPNTable;

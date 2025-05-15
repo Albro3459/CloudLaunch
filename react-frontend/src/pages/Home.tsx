@@ -6,7 +6,7 @@ import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/r
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
 
-import VPNTable, { VPNTableEntry } from "../components/VPNTable";
+import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 
@@ -152,7 +152,6 @@ const Home: React.FC = () => {
         console.error("Error during deployment:", error);
         }
     };
-
     
     const handleCreateNewAccount = () => {
         if (role === "admin") {
@@ -385,12 +384,14 @@ const Home: React.FC = () => {
                 </div>
             </>
             }
-
-            <VPNTable
-                data={VPNTableEntries}
-                isAdmin={true}
-                onStatusChange={(index, newStatus) => {}}
-            />
+            
+            {VPNTableEntries.length > 0 &&
+                <VPNTable
+                    data={VPNTableEntries}
+                    isAdmin={role === "admin"}
+                    onStatusChange={(index, newStatus) => {}}
+                />
+            }
 
             {/* Loading Overlay (Blocks clicks and dims background) */}
             {loading && (
