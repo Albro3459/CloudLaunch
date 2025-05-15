@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Download, QrCode } from "lucide-react";
 
 export type VPNTableEntry = {

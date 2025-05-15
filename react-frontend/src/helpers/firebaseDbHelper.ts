@@ -3,7 +3,6 @@ import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 import { getUserRole } from "./usersHelper";
 import { getRegionName } from "./regionsHelper";
-import { auth } from "../firebase";
 
 export type VPNData = {
     email: string | null;

@@ -60,5 +60,5 @@ export const getLiveRegions = async (): Promise<Region[] | null> => {
 };
 
 export const getRegionName = (region: string) => {
-    return aws_regions.find(r => r.value == region)?.name || null;
+    return aws_regions.find(r => r.value === region)?.name || null;
 };
