@@ -6,7 +6,7 @@ from get_secrets import get_secret
 
 SOURCE_REGION = "us-west-1"
 
-def create_user(email, password):
+def create_auth_user(email, password):
     try:
         user = auth.create_user(email=email, password=password)
         return user.uid
@@ -14,16 +14,18 @@ def create_user(email, password):
         print("Error: User already exists:", e)
         return auth.EmailAlreadyExistsError
     except Exception as e:
-        print("Error creating user:", e)
+        print("Error creating auth user:", e)
         return None
 
-def create_role(uid):
+def create_firestore_user(uid, email):
     try:
         db = firestore.client()
-        db.collection("Users").document(uid).set({"role": "user"})
+        db.collection("Users").document(uid).set({"email": email})
+        db.collection("Roles").document(uid).set({"role": "user"})
+        
         return True
     except Exception as e:
-        print("Error setting role:", e)
+        print("Error creating firestore user:", e)
         return False
 
 def lambda_handler(event, context):
@@ -51,7 +53,7 @@ def lambda_handler(event, context):
         len(email) == 0 or len(password) == 0 or len(token) == 0:
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {email}, {password}"})
+            "body": json.dumps({"error": f"Missing required parameters: {email}"})
         }
 
     # Fetch secrets
@@ -74,14 +76,14 @@ def lambda_handler(event, context):
         return {"statusCode": 403, "body": json.dumps({"error": "Error: Not admin role"})}
     
     
-    uuid = create_user(email, password)
+    uuid = create_auth_user(email, password)
     if not uuid:
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user: {email.split('@')[0]}"})}
-    success = create_role(uuid)
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create user: {email}"})}
+    success = create_firestore_user(uuid, email)
     if not success:
         if uuid == auth.EmailAlreadyExistsError:
-            return {"statusCode": 403, "body": json.dumps({"error": f"Error: Account already exists for user: {email.split('@')[0]}"})}
-        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user: {email.split('@')[0]}"})}
+            return {"statusCode": 403, "body": json.dumps({"error": f"Error: Account already exists for user: {email}"})}
+        return {"statusCode": 403, "body": json.dumps({"error": f"Failed to create role for user: {email}"})}
 
     return {
         "statusCode": 200,

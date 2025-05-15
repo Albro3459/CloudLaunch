@@ -7,7 +7,7 @@ service cloud.firestore {
   }
 
   function isAdmin() {
-    return get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.role == "admin";
+    return get(/databases/$(database)/documents/Roles/$(request.auth.uid)).data.role == "admin";
   }
 
   function isUserOwner(userId) {
@@ -19,19 +19,28 @@ service cloud.firestore {
   }
 
   match /databases/{database}/documents {
+
+    match /Roles/{userId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isAdmin();
+    }
+
     match /Users/{userId} {
-      allow read, write: if isAuth() && isOwnerOrAdmin(userId);
+      allow read, list: if isAuth();
+      allow write: if isAuth() && isOwnerOrAdmin(userId);
 
       match /Regions/{regionId} {
-        allow read, write: if isAuth() && isOwnerOrAdmin(userId);
+        allow read: if isAuth();
+        allow write: if isAuth() && isOwnerOrAdmin(userId);
     
         match /Instances/{instanceId} {
-          allow read, write: if isAuth() && isOwnerOrAdmin(userId);
+          allow read: if isAuth();
+          allow write: if isAuth() && isOwnerOrAdmin(userId);
         }
       }
     }
     match /Live-Regions/{regionId} {
-      allow read: if isAuth();
+      allow read, list: if isAuth();
       allow write: if isAuth() && isAdmin();
     }
   }
