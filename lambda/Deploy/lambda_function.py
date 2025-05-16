@@ -38,18 +38,18 @@ def lambda_handler(event, context):
 
     # Extract required values
         # Action params
-    action = body.get("action", "").strip() # ALWAYS REQUIRED
+    action = (body.get("action") or "").strip() # ALWAYS REQUIRED
     # targets = {
     #     "userID": {
     #         "us-west-1": ["i-0123"],
     #         "us-east-1": ["i-0456"]
     #     }
     # }
-    targets = body.get("targets", {}) # (Required for non-deploy actions)
+    targets = body.get("targets") or {} # (Required for non-deploy actions)
     
         # Deploy params (Required for Deploy)
-    email = body.get("email", "").strip()
-    target_region = body.get("target_region", "").strip()    
+    email = (body.get("email") or "").strip()
+    target_region = (body.get("target_region") or "").strip()    
 
     # Validate input
     if not token:
@@ -66,7 +66,10 @@ def lambda_handler(event, context):
         }        
         
     # Fetch secrets
-    secrets = get_secret(f"wireguard/config/{target_region}", target_region)
+    if not target_region and action.lower() == "terminate":
+        secrets = get_secret(f"wireguard/config/{SOURCE_REGION}", SOURCE_REGION)
+    else:
+        secrets = get_secret(f"wireguard/config/{target_region}", target_region)
     if not secrets:
         return {
             "statusCode": 500,
@@ -97,7 +100,7 @@ def lambda_handler(event, context):
         
     # Perform Action        
 
-    if action == "terminate":
+    if action.lower() == "terminate":
         if role != "admin":
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
         if not targets or not isinstance(targets, dict):
@@ -121,7 +124,7 @@ def lambda_handler(event, context):
                 region_instance_map[region].extend(instance_ids)
 
         # dict(defaultdict) converts to regular dict
-        batch_update_aws_instances(action, dict(region_instance_map))
+        batch_update_aws_instances(action.lower(), dict(region_instance_map))
         
         # Call Firestore update per user
         for uid, region_map in targets.items():
@@ -130,11 +133,11 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "action_completed": action
+                "action_completed": action.lower()
             })
         }
         
-    elif action == "deploy":
+    elif action.lower() == "deploy":
         if not email or not target_region:
             print(f"Missing required parameters: {email}, {target_region}")
             return {

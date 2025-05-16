@@ -72,7 +72,7 @@ def get_users_instances(user_id, target_regions=None):
                 continue
             region_id = region_doc.id
             instances_ref = regions_ref.document(region_id).collection("Instances")
-            query = instances_ref.where("status", "in", ["running", "stopped"]) # Live statuses
+            query = instances_ref.where("status", "in", ["Running", "Stopped"]) # Live statuses
             docs = query.stream()
 
             instances = []

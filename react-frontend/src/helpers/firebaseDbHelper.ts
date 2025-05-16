@@ -2,7 +2,6 @@ import { User } from "firebase/auth";
 import { getFirestore, collection, getDocs } from "firebase/firestore";
 
 import { getUserRole } from "./usersHelper";
-import { getRegionName } from "./regionsHelper";
 
 export type VPNData = {
     userID: string;
@@ -36,8 +35,8 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
         const vpnData: VPNData[] = [];
 
         for (const regionDoc of regionSnapshots.docs) {
-            const regionId = regionDoc.id;
-            const instancesRef = collection(db, "Users", userID, "Regions", regionId, "Instances");
+            const regionID = regionDoc.id;
+            const instancesRef = collection(db, "Users", userID, "Regions", regionID, "Instances");
             const instanceSnapshots = await getDocs(instancesRef);
 
             instanceSnapshots.forEach((instanceDoc) => {
@@ -46,7 +45,7 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
                     vpnData.push({
                         userID: userID,
                         email: email,
-                        region: getRegionName(regionId),
+                        region: regionID,
                         instanceID: instanceDoc.id,
                         ipv4: ipv4,
                         status: status,

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { QrCode } from "lucide-react";
 import { Targets } from "../helpers/APIHelper";
 import { TOGGLE } from "../pages/Home";
+import { getRegionName } from "../helpers/regionsHelper";
 
 export type VPNTableEntry = {
     userID: string;
@@ -34,7 +35,7 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                 {isAdmin && targets && Object.keys(targets).length > 0 && 
                     <button 
                         onClick={() => {
-                            if (confirm("Are you sure you want to terminate selected instances?")) {
+                            if (window.confirm("Are you sure you want to terminate selected instances?")) {
                                 actionFunc(targets);
                             }
                         }}
@@ -76,7 +77,7 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                                         <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
                                     </>
                                 }
-                                <td className="px-4 py-2 text-center">{entry.region || "Null"}</td>
+                                <td className="px-4 py-2 text-center">{getRegionName(entry.region) || "Null"}</td>
                                 <td className="px-4 py-2 text-center">{entry.ipv4}</td>
                                 <td className="px-4 py-2 text-center">{capitalized(entry.status)}</td>
                                 <td className="px-4 py-2 flex justify-center">

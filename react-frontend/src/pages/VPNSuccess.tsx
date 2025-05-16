@@ -110,7 +110,7 @@ const VPNSuccess: React.FC = () => {
                     <p className="text-gray-700">
                         {isNew ? (
                             <>
-                                A new VPN has been deployed in <b>{region}</b>.
+                                A VPN has been deployed in <b>{region}</b>.
                             </>
                         ) : (
                             <>
