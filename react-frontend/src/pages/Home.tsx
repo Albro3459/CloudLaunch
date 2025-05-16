@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
-import { SecureGetHelper, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
+import { ACTION, SecureGetHelper, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
 import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
@@ -14,12 +14,18 @@ import { getUsersVPNs, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
 
+export enum TOGGLE {
+    ADD,
+    REMOVE
+}
+
 const Home: React.FC = () => {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState<string | null>(null);
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
@@ -48,7 +54,7 @@ const Home: React.FC = () => {
                 console.error("Error: JWT token not found");
             }
             else {
-                const response = await VPNdeployHelper(region, email || "", jwtToken);
+                const response = await VPNdeployHelper(ACTION.DEPLOY, null, email || "", region, jwtToken);
             
                 setLoading(false);
 
@@ -142,6 +148,86 @@ const Home: React.FC = () => {
         } catch (error) {
             setErrorMessage("Error during clean");
             console.error("Error during clean:", error);
+        }
+    };
+
+    // Terminate Action
+
+    const [targets, setTargets] = useState<Targets>({});
+    
+    const toggleTarget = (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => {
+        if (!region) return;
+    
+        setTargets(prev => {
+            const updated = { ...prev };
+
+            if (toggle === TOGGLE.ADD) {
+                if (!updated[userID]) {
+                    updated[userID] = {};
+                }
+                if (!updated[userID][region]) {
+                    updated[userID][region] = [];
+                }
+                if (!updated[userID][region].includes(instanceID)) {
+                    updated[userID][region].push(instanceID);
+                }
+            }
+            else if (toggle === TOGGLE.REMOVE) {
+                if (updated[userID]?.[region]) {
+                    updated[userID][region] = updated[userID][region].filter(id => id !== instanceID);
+        
+                    if (updated[userID][region].length === 0) {
+                        delete updated[userID][region];
+                    }
+        
+                    if (Object.keys(updated[userID]).length === 0) {
+                        delete updated[userID];
+                    }
+                }
+            }
+    
+            return updated;
+        });
+    };    
+
+    const handleTerminate = async (targets: Targets) => {
+        if (Object.keys(targets).length === 0) {
+            setErrorMessage("No instances selected");
+            return;
+        }
+
+        setLoading(true);
+        
+        try {
+            if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
+                console.error("Error: JWT token not found");
+                return;
+            }
+            else {
+                const response = await VPNdeployHelper(ACTION.TERMINATE, targets, null, null, jwtToken);
+            
+                if (!response.success) {
+                    setErrorMessage(response.error || "Something went wrong");
+                    return;
+                }
+
+                const { action_completed } = response.data;
+
+                console.log("ACTION COMPLETED: ", action_completed);
+
+                setTargets({});
+
+                if (user) {
+                    await fillVPNs(user);
+                }
+            }
+
+        } catch (error) {
+            setErrorMessage("Error during termination");
+            console.error("Error during termination:", error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -256,6 +342,7 @@ const Home: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
                 if (user) {
+                    setUser(user);
                     setRole(await getUserRole(user));
                     setEmail(user.email);
                     await fillVPNs(user);
@@ -462,7 +549,9 @@ const Home: React.FC = () => {
                 <VPNTable
                     data={VPNTableEntries}
                     isAdmin={role === "admin"}
-                    onStatusChange={(index, newStatus) => {}}
+                    targets={targets}
+                    toggleTarget={toggleTarget}
+                    actionFunc={handleTerminate}
                 />
             }
 

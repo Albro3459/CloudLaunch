@@ -1,5 +1,6 @@
 import json
 import boto3
+from collections import defaultdict
 
 from vpn_manager import batch_update_aws_instances, check_image_exists, deploy_instance, terminate_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
@@ -11,7 +12,7 @@ CLEANUP_VPNS = True
 SOURCE_REGION = "us-west-1"
 SENDER="CloudLaunch <noreply@cloudlaunch.live>"
 ADMIN="brodsky.alex22@gmail.com"
-VALID_ACTIONS = {"deploy", "start", "stop", "terminate"}
+VALID_ACTIONS = {"deploy", "terminate"}
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -36,24 +37,33 @@ def lambda_handler(event, context):
         }
 
     # Extract required values
-    target_region = body.get("region", "").strip()
-    action = body.get("action", "").strip()
+        # Action params
+    action = body.get("action", "").strip() # ALWAYS REQUIRED
+    # targets = {
+    #     "userID": {
+    #         "us-west-1": ["i-0123"],
+    #         "us-east-1": ["i-0456"]
+    #     }
+    # }
+    targets = body.get("targets", {}) # (Required for non-deploy actions)
+    
+        # Deploy params (Required for Deploy)
     email = body.get("email", "").strip()
+    target_region = body.get("target_region", "").strip()    
 
     # Validate input
-    if not target_region or not token:
-        print(f"Missing required parameters: {target_region}")
+    if not token:
+        print(f"Missing required parameter")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters"})
+            "body": json.dumps({"error": f"Missing required parameter"})
         }
-    if not action:
-        print(f"Missing required parameter.: {action}")
+    if not action or action.lower() not in VALID_ACTIONS:
+        print(f"Missing or invalid action: {action}")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameter."})
-        }
-        
+            "body": json.dumps({"error": f"Missing or invalid action"})
+        }        
         
     # Fetch secrets
     secrets = get_secret(f"wireguard/config/{target_region}", target_region)
@@ -85,24 +95,37 @@ def lambda_handler(event, context):
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
         
-    # Perform Action    
-        
-    action = action.lower()
-    if action in {"start", "stop", "terminate"}:
+    # Perform Action        
+
+    if action == "terminate":
         if role != "admin":
             return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
+        if not targets or not isinstance(targets, dict):
+            print(f"Invalid or missing targets: {targets}")
+            return {"statusCode": 400, "body": json.dumps({"error": "Invalid or missing targets"})}
+
         
-        region_instance_map = get_users_instances(user_id)
+        # targets = {
+        #     "userID": {
+        #         "us-west-1": ["i-0123"],
+        #         "us-east-1": ["i-0456"]
+        #     }
+        # }
         
-        batch_update_aws_instances(action, region_instance_map)
+        print(f"User {user_id}: terminating {targets}")
         
-        status = {
-            "start": "Running",
-            "stop": "Paused",
-            "terminate": "Terminated"
-        }.get(action)
+        # defaultdict(...) to avoid missing key errors
+        region_instance_map = defaultdict(list)
+        for uid, regions in targets.items():
+            for region, instance_ids in regions.items():
+                region_instance_map[region].extend(instance_ids)
+
+        # dict(defaultdict) converts to regular dict
+        batch_update_aws_instances(action, dict(region_instance_map))
         
-        batch_update_instance_statuses(user_id, region_instance_map, status)
+        # Call Firestore update per user
+        for uid, region_map in targets.items():
+            batch_update_instance_statuses(uid, region_map, "Terminated")
             
         return {
             "statusCode": 200,
@@ -111,16 +134,9 @@ def lambda_handler(event, context):
             })
         }
         
-    elif action in {"deploy"}:
-        if not email:
-            print(f"Missing required param: {email}")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": f"Missing required param"})
-            }
-            
-        if not target_region:
-            print(f"Missing required parameters: {target_region}")
+    elif action == "deploy":
+        if not email or not target_region:
+            print(f"Missing required parameters: {email}, {target_region}")
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": f"Missing required parameters"})

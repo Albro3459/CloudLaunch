@@ -1,9 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { QrCode } from "lucide-react";
+import { Targets } from "../helpers/APIHelper";
+import { TOGGLE } from "../pages/Home";
 
 export type VPNTableEntry = {
+    userID: string;
     email: string | null;
     region: string | null;
+    instanceID: string;
     ipv4: string;
     status: string;
     onQrCodeClick: () => void;
@@ -12,30 +16,32 @@ export type VPNTableEntry = {
 type VPNTableData = {
     data: VPNTableEntry[];
     isAdmin: boolean;
-    onStatusChange?: (index: number, newStatus: string) => void;
+    targets: Targets;
+    toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
+    actionFunc: (targets: Targets) => void;
 };
 
 const capitalized = (str: string) => {
     return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
-export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => {
-    const actionOptions: Record<string, string> = {
-        "Running": "Start", 
-        "Paused": "Pause",
-        "Terminated": "Terminate"
-    };
+export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc }) => {
 
     return (
         <div className="bg-white mt-8 p-6 rounded-2xl shadow-lg w-full max-w-4xl relative">
             <div className="text-center relative mb-4 mt-2">
                 <h2 className="text-2xl font-semibold">VPN Instances</h2>
-                {true && 
-                <button 
-                    className="absolute top-0 right-0 p-3 rounded-lg transition cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
-                >
-                    Apply
-                </button>
+                {isAdmin && targets && Object.keys(targets).length > 0 && 
+                    <button 
+                        onClick={() => {
+                            if (confirm("Are you sure you want to terminate selected instances?")) {
+                                actionFunc(targets);
+                            }
+                        }}
+                        className="absolute top-0 right-0 p-2 rounded-lg transition cursor-pointer bg-red-600 text-white hover:bg-red-700"
+                    >
+                        Terminate
+                    </button>
                 }
             </div>
             
@@ -44,11 +50,14 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange
                     <thead className="border-b border-gray-200 text-gray-900">
                         <tr>
                             {isAdmin &&
-                                <th className="px-4 py-2">User</th>
+                                <>
+                                    <th className="px-4 py-2 text-center">Terminate</th>
+                                    <th className="px-4 py-2 text-center">User</th>
+                                </>
                             }
-                            <th className="px-4 py-2">Region</th>
-                            <th className="px-4 py-2">Address</th>
-                            <th className="px-4 py-2">Status</th>
+                            <th className="px-4 py-2 text-center">Region</th>
+                            <th className="px-4 py-2 text-center">Address</th>
+                            <th className="px-4 py-2 text-center">Status</th>
                             <th className="px-4 py-2 text-center">Actions</th>
                         </tr>
                     </thead>
@@ -56,32 +65,21 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange
                         {data.map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                                 {isAdmin &&
-                                    <td className="px-4 py-2">{entry.email || "Null"}</td>
+                                    <>
+                                        <td className="px-4 py-4 flex justify-center items-center">
+                                        <input 
+                                            type="checkbox"
+                                            checked={targets?.[entry.userID]?.[entry.region || ""]?.includes(entry.instanceID) || false}
+                                            onChange={(e) => toggleTarget(e.target.checked ? TOGGLE.ADD : TOGGLE.REMOVE, entry.userID, entry.region, entry.instanceID) }
+                                        />
+                                        </td>
+                                        <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
+                                    </>
                                 }
-                                <td className="px-4 py-2">{entry.region || "Null"}</td>
-                                <td className="px-4 py-2">{entry.ipv4}</td>
-                                <td className="px-4 py-2">{capitalized(entry.status)}</td>
-                                <td className="px-4 py-2 flex justify-center space-x-4">
-                                    {isAdmin && 
-                                        <select
-                                            value={actionOptions[capitalized(entry.status)] || ""}
-                                            onChange={(e) =>
-                                                onStatusChange?.(index, e.target.value)
-                                            }
-                                            className="p-2 border rounded-lg focus:ring-blue-500 focus:outline-none"
-                                        >
-                                            <option value="">{actionOptions[capitalized(entry.status)]}</option>
-                                            {Object.entries(actionOptions).map(([status, action]) => {
-                                                return status.toLowerCase() !== entry.status.toLowerCase() &&
-                                                    <option 
-                                                        key={status} 
-                                                        value={action}
-                                                    >
-                                                        {action}
-                                                    </option>
-                                            })}
-                                        </select>
-                                    }
+                                <td className="px-4 py-2 text-center">{entry.region || "Null"}</td>
+                                <td className="px-4 py-2 text-center">{entry.ipv4}</td>
+                                <td className="px-4 py-2 text-center">{capitalized(entry.status)}</td>
+                                <td className="px-4 py-2 flex justify-center">
                                     <button
                                         onClick={entry.onQrCodeClick}
                                         className="text-blue-600 hover:text-blue-800"

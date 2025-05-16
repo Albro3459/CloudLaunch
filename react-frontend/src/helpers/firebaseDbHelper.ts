@@ -5,8 +5,10 @@ import { getUserRole } from "./usersHelper";
 import { getRegionName } from "./regionsHelper";
 
 export type VPNData = {
+    userID: string;
     email: string | null;
     region: string | null;
+    instanceID: string;
     ipv4: string;
     status: string;
 }
@@ -42,8 +44,10 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
                 const { ipv4, status } = instanceDoc.data();
                 if (ipv4 && status && status.toLowerCase() !== "terminated") {
                     vpnData.push({
+                        userID: userID,
                         email: email,
                         region: getRegionName(regionId),
+                        instanceID: instanceDoc.id,
                         ipv4: ipv4,
                         status: status,
                     });

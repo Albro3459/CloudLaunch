@@ -41,15 +41,29 @@ export const SecureGetHelper = async (requested_keys: string[], token: string) =
     }
 };
 
-export const VPNdeployHelper = async (region: string, email: string, token: string) => {
+
+export type Targets = {
+    [userID: string]: {
+      [region: string]: string[]; // Array of instance IDs
+    };
+};
+
+export enum ACTION {
+    DEPLOY = "deploy",
+    TERMINATE = "terminate"
+}
+
+export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, email: string | null, target_region: string | null, token: string) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
         const raw = JSON.stringify({
-            "region": region,
-            "email" : email
+            "action": action,
+            "targets": targets,
+            "email" : email,
+            "target_region": target_region,
         });
 
         const requestOptions: RequestInit = {

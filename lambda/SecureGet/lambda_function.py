@@ -26,7 +26,7 @@ def lambda_handler(event, context):
     requested_keys = body.get("requested_keys", [])
 
     # Validate input
-    if not isinstance(requested_keys, list) or not requested_keys:
+    if not requested_keys or not isinstance(requested_keys, list):
         print(f"Missing parameters: {requested_keys}")
         return {
             "statusCode": 400,
