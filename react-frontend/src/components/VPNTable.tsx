@@ -1,5 +1,5 @@
 import React from "react";
-import { Download, QrCode } from "lucide-react";
+import { QrCode } from "lucide-react";
 
 export type VPNTableEntry = {
     email: string | null;
@@ -7,7 +7,6 @@ export type VPNTableEntry = {
     ipv4: string;
     status: string;
     onQrCodeClick: () => void;
-    onDownloadClick: () => void;
 };
 
 type VPNTableData = {
@@ -85,12 +84,6 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange
                                         className="text-blue-600 hover:text-blue-800"
                                     >
                                         <QrCode size={20} />
-                                    </button>
-                                    <button
-                                        onClick={entry.onDownloadClick}
-                                        className="text-green-600 hover:text-green-800"
-                                    >
-                                        <Download size={20} />
                                     </button>
                                 </td>
                             </tr>

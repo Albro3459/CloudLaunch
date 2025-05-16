@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
+import { saveAs } from "file-saver";
+import QRCode from "qrcode";
+
+import { SecureGetHelper, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
 import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
@@ -9,9 +12,17 @@ import { SOURCE_REGION } from "../Secrets/source_region";
 import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
+import { generateConfig } from "../helpers/configHelper";
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
+
+    const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const [email, setEmail] = useState<string | null>(null);
+    const [role, setRole] = useState<string | null>(null);
+    const [jwtToken, setJwtToken] = useState<string | null>(null);
 
     const [liveRegions, setLiveRegions] = useState<Region[] | null>();
 
@@ -19,21 +30,21 @@ const Home: React.FC = () => {
     const [terraformRegion, setTerraformRegion] = useState("");
     const [cleanRegion, setCleanRegion] = useState("");
 
-    const [email, setEmail] = useState<string | null>(null);
-    const [role, setRole] = useState<string | null>(null);
-    const [jwtToken, setJwtToken] = useState<string | null>(null);
+    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);
+    const [vpnRegion, setVpnRegion] = useState<string | null>(null);
+    const [IP, setIP] = useState<string | null>(null);
+    const [clientPrivateKey, setClientPrivateKey] = useState<string | null>(null);
+    const [serverPublicKey, setServerPublicKey] = useState<string | null>(null);
+    const [configData, setConfigData] = useState<string | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-    const [loading, setLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);    
-    
     const handleDeploySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         
         try {
             if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
                 console.error("Error: JWT token not found");
             }
             else {
@@ -55,7 +66,8 @@ const Home: React.FC = () => {
             }
 
         } catch (error) {
-        console.error("Error during deployment:", error);
+            setErrorMessage("Error during deployment");
+            console.error("Error during deployment:", error);
         }
     };
 
@@ -65,6 +77,7 @@ const Home: React.FC = () => {
         
         try {
             if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
                 console.error("Error: JWT token not found");
             }
             else {
@@ -90,7 +103,8 @@ const Home: React.FC = () => {
             }
 
         } catch (error) {
-        console.error("Error during deployment:", error);
+            setErrorMessage("Error during terraform");
+            console.error("Error during terraform:", error);
         }
     };
 
@@ -100,6 +114,7 @@ const Home: React.FC = () => {
         
         try {
             if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
                 console.error("Error: JWT token not found");
             }
             else {
@@ -125,9 +140,75 @@ const Home: React.FC = () => {
             }
 
         } catch (error) {
-        console.error("Error during deployment:", error);
+            setErrorMessage("Error during clean");
+            console.error("Error during clean:", error);
         }
     };
+
+    // QR code functions
+    const secureGet = useCallback(async () => {
+        try {
+            if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
+                console.error("Error: JWT token not found");
+                return null;
+            }
+            else {
+                const response = await SecureGetHelper(["client_private_key", "server_public_key"], jwtToken);
+            
+                if (!response.success) {
+                    setErrorMessage(response.error || "Something went wrong");
+                    return null;
+                }
+
+                const { client_private_key, server_public_key } = response.data;
+
+                setClientPrivateKey(client_private_key);
+                setServerPublicKey(server_public_key);
+
+                return { client_private_key, server_public_key };
+            }
+
+        } catch (error) {
+            setErrorMessage("Error while fetching secrets");
+            console.error("Error while fetching secrets: ", error);
+            return null;
+        }
+    }, [jwtToken]);
+    
+    const handleQRcode = useCallback(async (IPv4: string, region: string | null) => {
+        if (!IPv4) {
+            setErrorMessage("Invalid IP address for QR code.");
+            console.error("Invalid IP address for QR code.");
+            return;
+        }
+
+        setLoading(true);
+
+        setIP(IPv4); setVpnRegion(region);
+
+        // Cache the keys
+        let clientKey = clientPrivateKey;
+        let serverKey = serverPublicKey;
+        if (!clientKey || !serverKey) {
+            const secrets = await secureGet();
+            if (secrets) {
+                clientKey = secrets.client_private_key;
+                serverKey = secrets.server_public_key;
+            }
+        }
+        
+        if (clientKey && serverKey) {
+            const config = await generateConfig(clientKey, serverKey, IPv4);
+            setConfigData(config);
+        } else {
+            setErrorMessage("Failed to retrieve keys for QR code.");
+            console.error("Failed to retrieve keys for QR code.");
+        }
+
+        setLoading(false);
+    }, [clientPrivateKey, serverPublicKey, secureGet]);
+    
     
     const handleCreateNewAccount = () => {
         if (role === "admin") {
@@ -135,14 +216,30 @@ const Home: React.FC = () => {
         }
     }
 
-    const fillVPNs = async (user: User) => {
+    const fillVPNs = useCallback(async (user: User) => {
         const VPNs: VPNData[] = await getUsersVPNs(user);
         setVPNTableEntries(VPNs.map((vpn) => ({
             ...vpn,
-            onQrCodeClick: () => {},
-            onDownloadClick: () => {}
+            onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
         })))
+    }, [handleQRcode]);
+
+    const handleDownload = () => {
+        if (configData) {
+            const blob = new Blob([configData], { type: "text/plain;charset=utf-8" });
+            saveAs(blob, `wireguard.conf`);
+        }
     };
+
+    useEffect(() => {
+        if (configData && canvasRef.current) {
+            QRCode.toCanvas(canvasRef.current, configData, {
+                width: 250,
+            }, (error) => {
+                if (error) console.error("QR Code generation failed:", error);
+            });
+        }
+    }, [configData]);
 
     useEffect(() => {
         const fetchLiveRegions = async () => {
@@ -176,7 +273,7 @@ const Home: React.FC = () => {
             fetchUserData();
         });
         return () => unsubscribe();
-    }, [navigate]);
+    }, [navigate, fillVPNs]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -368,6 +465,40 @@ const Home: React.FC = () => {
                     onStatusChange={(index, newStatus) => {}}
                 />
             }
+
+            {/* QR code overlay with download button */}
+            {configData && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+                    <div className="bg-white p-6 rounded-2xl shadow-lg text-center relative max-w-md w-full">
+                        <button
+                            onClick={() => { setConfigData(null); setIP(null) }}
+                            className="absolute top-2 right-3 text-gray-500 hover:text-black text-lg font-bold"
+                        >
+                            ×
+                        </button>
+                        <h3 className="text-2xl font-semibold mb-2">VPN QR Code</h3>
+
+                        {vpnRegion && (
+                            <p className="pt-1 text-gray-700">
+                                Region: <b>{vpnRegion}</b>
+                            </p>
+                        )}
+
+                        {IP && (
+                            <p className="pt-1 text-gray-700">
+                                IP Address: <b>{IP}</b>
+                            </p>
+                        )}
+                        <canvas ref={canvasRef} className="mt-2 mx-auto" />
+                        <button
+                            onClick={handleDownload}
+                            className="cursor-pointer bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition mt-4"
+                        >
+                            Download Config
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Loading Overlay (Blocks clicks and dims background) */}
             {loading && (

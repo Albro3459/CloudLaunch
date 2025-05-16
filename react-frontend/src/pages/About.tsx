@@ -83,7 +83,7 @@ const About: React.FC = () => {
                 </p>
                 <p className="text-gray-700 mb-4">
                     Generate your VPN configuration instantly, download the <b>.conf</b> file, or scan a QR code for easy setup on 
-                    your devices-all in just a few clicks.
+                    your devices. All in just a few clicks.
                 </p>
                 <p className="text-gray-700">
                     <b>Secure, simple, and instant.</b> Your personal cloud VPN, deployed on demand.

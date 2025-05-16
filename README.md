@@ -17,7 +17,7 @@
 
  * The entire deployment process is automated using AWS Lambda, ensuring a fast, efficient, and hassle-free setup.
 
- * Generate your VPN configuration instantly, download the .conf file, or scan a QR code for easy setup on your devices-all in just a few clicks.
+ * Generate your VPN configuration instantly, download the .conf file, or scan a QR code for easy setup on your devices. All in just a few clicks.
 
  * Secure, simple, and instant. Your personal cloud VPN, deployed on demand with little to no setup needed.
  

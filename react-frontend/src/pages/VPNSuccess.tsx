@@ -33,8 +33,8 @@ const VPNSuccess: React.FC = () => {
     useEffect(() => {
         // console.log(ip);
         if (client_private_key && server_public_key && ip) {
-        const config = generateConfig(client_private_key, server_public_key, ip);
-        setConfigData(config);
+            const config = generateConfig(client_private_key, server_public_key, ip);
+            setConfigData(config);
         }
     }, [client_private_key, server_public_key, ip]);
 
@@ -124,20 +124,20 @@ const VPNSuccess: React.FC = () => {
 
                 {ip && ip.length > 0 && (
                     <p className="pt-1 text-gray-700">
-                    IP Address: <b>{ip}</b>
+                        IP Address: <b>{ip}</b>
                     </p>
                 )}
 
                 {/* QR Code Canvas */}
-                {ip && ip.length > 0 && (
+                {configData && (
                     <>
-                    <canvas ref={canvasRef} className="mt-4 mx-auto"></canvas>
-                    <button 
-                        onClick={handleDownload} 
-                        className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition mt-6"
-                    >
-                        Download Config
-                    </button>
+                        <canvas ref={canvasRef} className="mt-4 mx-auto"></canvas>
+                        <button 
+                            onClick={handleDownload} 
+                            className="cursor-pointer w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition mt-6"
+                        >
+                            Download Config
+                        </button>
                     </>
                 )}
                 </div>

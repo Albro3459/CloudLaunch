@@ -60,51 +60,30 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
 };
 
 const getAdminVPNs = async (user: User): Promise<VPNData[]> => {
-    // try {        
-    //     if (await getUserRole(user) !== "admin") {
-    //         console.warn("Not an admin. Cannot fetch VPNs for admin.");
-    //         return [];
-    //     }
+    try {        
+        if (await getUserRole(user) !== "admin") {
+            console.warn("Not an admin. Cannot fetch VPNs for admin.");
+            return [];
+        }
 
-    //     const db = getFirestore();
-    //     const usersSnapshot = await getDocs(collection(db, "Users"));
+        const db = getFirestore();
+        const usersSnapshot = await getDocs(collection(db, "Users"));
 
-    //     let vpnData: VPNData[] = [];
+        let vpnData: VPNData[] = [];
 
-    //     // for (const userDoc of usersSnapshot.docs) {
-    //     //     vpnData.push(...await getVPNs(userDoc.id, userDoc.data().email))
-    //     // }
+        // for (const userDoc of usersSnapshot.docs) {
+        //     vpnData.push(...await getVPNs(userDoc.id, userDoc.data().email))
+        // }
 
-    //     // Same thing but this parallelizes to increase efficiency
-    //     vpnData = (await Promise.all(
-    //         usersSnapshot.docs.map(userDoc => getVPNs(userDoc.id, userDoc.data().email))
-    //     )).flat();
+        // Same thing but this parallelizes to increase efficiency
+        vpnData = (await Promise.all(
+            usersSnapshot.docs.map(userDoc => getVPNs(userDoc.id, userDoc.data().email))
+        )).flat();
 
-    //     return vpnData;
+        return vpnData;
 
-    // } catch (error) {
-    //     console.warn("Error fetching VPNs for admin:", error);
-    //     return [];
-    // }
-
-    return [
-            {
-                email: "brooo",
-                region: getRegionName("us-west-1")!,
-                ipv4: "127.0.0.1",
-                status: "Running"
-            },
-            {
-                email: "yoooo",
-                region: "us-west-1",
-                ipv4: "127.0.0.1",
-                status: "Running"
-            },
-            {
-                email: "wooooo",
-                region: getRegionName("us-east-2")!,
-                ipv4: "127.0.0.1",
-                status: "Running"
-            }
-        ];
+    } catch (error) {
+        console.warn("Error fetching VPNs for admin:", error);
+        return [];
+    }
 }

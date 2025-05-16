@@ -55,8 +55,6 @@ def lambda_handler(event, context):
     role = get_user_role(user_id)
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
-    if role != "admin": 
-        return {"statusCode": 403, "body": json.dumps({"error": "Error: Not admin role"})}
     
     
     # Get AWS Secrets
