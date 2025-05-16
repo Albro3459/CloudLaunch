@@ -1,9 +1,9 @@
 import json
 import boto3
 
-from vpn_manager import check_image_exists, deploy_instance, terminate_all_other_instances
+from vpn_manager import batch_update_aws_instances, check_image_exists, deploy_instance, terminate_all_other_instances
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
-from firebase import get_user_instances_in_region, get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
+from firebase import batch_update_instance_statuses, get_user_instances_in_region, get_live_regions, get_users_instances, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 from notify import deliver_emails
 
@@ -11,6 +11,7 @@ CLEANUP_VPNS = True
 SOURCE_REGION = "us-west-1"
 SENDER="CloudLaunch <noreply@cloudlaunch.live>"
 ADMIN="brodsky.alex22@gmail.com"
+VALID_ACTIONS = {"deploy", "start", "stop", "terminate"}
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -36,15 +37,24 @@ def lambda_handler(event, context):
 
     # Extract required values
     target_region = body.get("region", "").strip()
+    action = body.get("action", "").strip()
     email = body.get("email", "").strip()
 
     # Validate input
-    if not target_region or not email or not token:
+    if not target_region or not token:
+        print(f"Missing required parameters: {target_region}")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing required parameters: {target_region}, {email}"})
+            "body": json.dumps({"error": f"Missing required parameters"})
         }
-
+    if not action:
+        print(f"Missing required parameter.: {action}")
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": f"Missing required parameter."})
+        }
+        
+        
     # Fetch secrets
     secrets = get_secret(f"wireguard/config/{target_region}", target_region)
     if not secrets:
@@ -74,93 +84,141 @@ def lambda_handler(event, context):
     role = get_user_role(user_id)
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
-    live_regions = get_live_regions()
-    if target_region not in [r["value"] for r in live_regions]:
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": "Target region is not live"})
-        }
-    
-    # Check if the user can make more VPNs
-    user_vpn_count = get_user_vpn_count(user_id, user_table)
-    vpn_role_max_count = get_max_count_for_role(role, role_table)
-    if user_vpn_count >= vpn_role_max_count:
-        return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
-    increment_user_count(user_id, user_table)
         
-    if not vpn_image_id or not security_group_id or not key_name:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Missing required secret values"})
-        }
-    
-    
-    ec2 = boto3.client("ec2", region_name=target_region)
-
-    # Check if Image exists
-    image_id = check_image_exists(ec2, target_region, vpn_image_id)
-    if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": image_id})
-        }
-                
-    # Make sure there are no running instances in the region for that user
-    # if there are, just return that instance ID
-    vpn = get_user_instances_in_region(user_id, role, target_region)
-    if vpn:
-        instance_ip = list(vpn.values())[0][0]["ipv4"]
-        print(f"VPN {instance_ip} already exists in region {target_region} for user {user_id}")
+    # Perform Action    
+        
+    action = action.lower()
+    if action in {"start", "stop", "terminate"}:
+        if role != "admin":
+            return {"statusCode": 403, "body": json.dumps({"error": "Unauthorized"})}
+        
+        region_instance_map = get_users_instances(user_id)
+        
+        batch_update_aws_instances(action, region_instance_map)
+        
+        status = {
+            "start": "Running",
+            "stop": "Paused",
+            "terminate": "Terminated"
+        }.get(action)
+        
+        batch_update_instance_statuses(user_id, region_instance_map, status)
+            
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "isNew": False,
-                "public_ipv4": instance_ip,
+                "action_completed": action
+            })
+        }
+        
+    elif action in {"deploy"}:
+        if not email:
+            print(f"Missing required param: {email}")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f"Missing required param"})
+            }
+            
+        if not target_region:
+            print(f"Missing required parameters: {target_region}")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": f"Missing required parameters"})
+            }
+            
+        live_regions = get_live_regions()
+        if target_region not in [r["value"] for r in live_regions]:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Target region is not live"})
+            }
+        
+        # Check if the user can make more VPNs
+        user_vpn_count = get_user_vpn_count(user_id, user_table)
+        vpn_role_max_count = get_max_count_for_role(role, role_table)
+        if user_vpn_count >= vpn_role_max_count:
+            return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
+        increment_user_count(user_id, user_table)
+            
+        if not vpn_image_id or not security_group_id or not key_name:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Missing required secret values"})
+            }
+        
+        
+        ec2 = boto3.client("ec2", region_name=target_region)
+
+        # Check if Image exists
+        image_id = check_image_exists(ec2, target_region, vpn_image_id)
+        if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": image_id})
+            }
+                    
+        # Make sure there are no running instances in the region for that user
+        # if there are, just return that instance ID
+        vpn = get_user_instances_in_region(user_id, role, target_region)
+        if vpn:
+            instance_ip = list(vpn.values())[0][0]["ipv4"]
+            print(f"VPN {instance_ip} already exists in region {target_region} for user {user_id}")
+            return {
+                "statusCode": 200,
+                "body": json.dumps({
+                    "isNew": False,
+                    "public_ipv4": instance_ip,
+                    "client_private_key": client_private_key,
+                    "server_public_key": server_public_key
+                })
+            }
+                
+        # Clean Up other instances:
+        if CLEANUP_VPNS:
+            # Terminate all instances for all users
+            # Also update statuses for all users instances in Firestore
+            terminate_all_other_instances(live_regions)
+
+        # Deploy the EC2 instance
+        result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
+        if not result:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Failed to deploy instance"})
+            }
+        instance_id, public_ip = result
+
+        if not public_ip:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Failed to retrieve instance public IP"})
+            }
+        if not instance_id:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Failed to retrieve instance ID"})
+            }
+            
+        # Send emails
+        ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
+        emails = [email]
+        if email != ADMIN:
+            emails.append(ADMIN)
+        
+        deliver_emails(ses_client, client_private_key, server_public_key, public_ip, target_region, SENDER, emails)
+
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "isNew": True,
+                "public_ipv4": public_ip,
                 "client_private_key": client_private_key,
                 "server_public_key": server_public_key
             })
         }
-            
-    # Clean Up other instances:
-    if CLEANUP_VPNS:
-        # Terminate all instances for all users
-        # Also update statuses for all users instances in Firestore
-        terminate_all_other_instances(live_regions)
-
-    # Deploy the EC2 instance
-    result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
-    if not result:
+    else:
+        print(f"{action} is not a valid action")
         return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed to deploy instance"})
-        }
-    instance_id, public_ip = result
-
-    if not public_ip:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed to retrieve instance public IP"})
-        }
-    if not instance_id:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed to retrieve instance ID"})
-        }
-        
-    # Send emails
-    ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
-    emails = [email]
-    if email != ADMIN:
-        emails.append(ADMIN)
-    
-    deliver_emails(ses_client, client_private_key, server_public_key, public_ip, target_region, SENDER, emails)
-
-    return {
-        "statusCode": 200,
-        "body": json.dumps({
-            "isNew": True,
-            "public_ipv4": public_ip,
-            "client_private_key": client_private_key,
-            "server_public_key": server_public_key
-        })
-    }
+                "statusCode": 400,
+                "body": json.dumps({"error": f"Not a valid action"})
+            }

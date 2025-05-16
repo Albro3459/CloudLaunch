@@ -113,7 +113,7 @@ def get_user_instances_in_region(user_id, role, region):
         return region_instances if region_instances else None
 
 
-def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
+def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName=None):
     try:
         db = firestore.client()
         region_ref = (
@@ -126,15 +126,25 @@ def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
         region_ref.set({"created": firestore.SERVER_TIMESTAMP}, merge=True)
         
         instance_ref = region_ref.collection("Instances").document(instance_id)
-        
+        instance_doc = instance_ref.get()
+
         instance_data = {
-            "createdAt": datetime.now(timezone.utc).isoformat(),
             "ipv4": ipv4,
-            "name": instanceName,
             "status": "running"
         }
+
+        if instance_doc.exists:
+            print(f"Updating existing instance {instance_id}")
+            if instanceName:
+                instance_data["name"] = instanceName  # Update name only if explicitly provided
+            instance_ref.set(instance_data, merge=True)
+        else:
+            print(f"Creating new instance {instance_id}")
+            instance_data["createdAt"] = datetime.now(timezone.utc).isoformat()
+            if instanceName:
+                instance_data["name"] = instanceName
+            instance_ref.set(instance_data)
         
-        instance_ref.set(instance_data)
         print(f"Instance {instance_id} saved for user {uid} in region {region}.")
     except Exception as e:
         print(f"Error saving instance: {e}")
@@ -183,7 +193,7 @@ def batch_update_instance_statuses(uid, region_instance_map, status):
         print(f"Error in batch update: {e}")
 
         
-def batch_update_all_users_instances(status="terminated"):
+def batch_update_all_instances(status):
     try:
         db = firestore.client()
         users = db.collection("Users").stream()

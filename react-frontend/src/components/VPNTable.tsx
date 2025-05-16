@@ -22,20 +22,23 @@ const capitalized = (str: string) => {
 export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, onStatusChange }) => {
     const actionOptions: Record<string, string> = {
         "Running": "Start", 
-        "Paused": "Pause"
+        "Paused": "Pause",
+        "Terminated": "Terminate"
     };
 
     return (
-        <div className="bg-white mt-8 p-6 rounded-2xl shadow-lg w-full max-w-4xl">
-            <h2 className="text-2xl font-semibold text-center mb-6">VPN Instances</h2>
-            {/* {actions && 
+        <div className="bg-white mt-8 p-6 rounded-2xl shadow-lg w-full max-w-4xl relative">
+            <div className="text-center relative mb-4 mt-2">
+                <h2 className="text-2xl font-semibold">VPN Instances</h2>
+                {true && 
                 <button 
-                    // onClick={handleApplyActions} 
-                    className={"w-full p-3 rounded-lg transition cursor-pointer bg-blue-600 text-white hover:bg-blue-700"}
-                    >
-                        Apply
+                    className="absolute top-0 right-0 p-3 rounded-lg transition cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
+                >
+                    Apply
                 </button>
-            } */}
+                }
+            </div>
+            
             <div className="overflow-x-auto">
                 <table className="min-w-full text-sm text-left text-gray-700">
                     <thead className="border-b border-gray-200 text-gray-900">
