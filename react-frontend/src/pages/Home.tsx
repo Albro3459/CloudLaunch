@@ -214,7 +214,7 @@ const Home: React.FC = () => {
 
                 const { action_completed } = response.data;
 
-                console.log("ACTION COMPLETED: ", action_completed);
+                // console.log("ACTION COMPLETED: ", action_completed);
 
                 setTargets({});
 
