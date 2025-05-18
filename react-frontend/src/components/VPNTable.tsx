@@ -28,22 +28,53 @@ const capitalized = (str: string) => {
 
 export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc }) => {
 
+    const [showConfirm, setShowConfirm] = useState(false);
+
     return (
         <div className="bg-white mt-8 p-6 rounded-2xl shadow-lg w-full max-w-4xl relative">
             <div className="text-center relative mb-4 mt-2">
                 <h2 className="text-2xl font-semibold">VPN Instances</h2>
-                {isAdmin && targets && Object.keys(targets).length > 0 && 
-                    <button 
-                        onClick={() => {
-                            if (window.confirm("Are you sure you want to terminate selected instances?")) {
-                                actionFunc(targets);
-                            }
-                        }}
+                {isAdmin && targets && Object.keys(targets).length > 0 && (
+                <>
+                    <button
+                        onClick={() => setShowConfirm(true)}
                         className="absolute top-0 right-0 p-2 rounded-lg transition cursor-pointer bg-red-600 text-white hover:bg-red-700"
                     >
                         Terminate
                     </button>
-                }
+
+                    {showConfirm && (
+                        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-xl shadow-lg max-w-sm w-full text-center">
+                                <h3 className="text-lg font-semibold mb-4">
+                                    Confirm Termination
+                                </h3>
+                                <p className="mb-6 text-sm text-gray-600">
+                                    Are you sure you want to terminate the selected instances?
+                                </p>
+                                <div className="flex justify-center gap-4">
+                                    <button
+                                        onClick={() => {
+                                            actionFunc(targets);
+                                            setShowConfirm(false);
+                                        }}
+                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                                    >
+                                        Yes, Terminate
+                                    </button>
+                                    <button
+                                        onClick={() => setShowConfirm(false)}
+                                        className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+
             </div>
             
             <div className="overflow-x-auto">
