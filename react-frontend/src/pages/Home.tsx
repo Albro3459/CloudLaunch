@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
 import { ACTION, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged } from "../firebase";
-import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
+import { aws_regions, getRegionName } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
 
@@ -14,6 +14,7 @@ import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
 import { useKeyStore } from "../stores/keyStore";
+import { useLiveRegionsStore } from "../stores/liveRegionsStore";
 
 export enum TOGGLE {
     ADD,
@@ -31,7 +32,8 @@ const Home: React.FC = () => {
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
-    const [liveRegions, setLiveRegions] = useState<Region[] | null>();
+    const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
+    // const [liveRegions, setLiveRegions] = useState<Region[] | null>();
 
     const [region, setRegion] = useState("");
     const [terraformRegion, setTerraformRegion] = useState("");
@@ -40,10 +42,8 @@ const Home: React.FC = () => {
     const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
-    const requestedKeys = ['client_private_key', 'server_public_key'];
+    const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
     const { keys, fetchKeys } = useKeyStore();
-    // const [clientPrivateKey, setClientPrivateKey] = useState<string | null>(null);
-    // const [serverPublicKey, setServerPublicKey] = useState<string | null>(null);
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -215,7 +215,7 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { action_completed } = response.data;
+                // const { action_completed } = response.data;
 
                 // console.log("ACTION COMPLETED: ", action_completed);
 
@@ -235,35 +235,6 @@ const Home: React.FC = () => {
     };
 
     // QR code functions
-    // const secureGet = useCallback(async () => {
-    //     try {
-    //         if (!jwtToken) {
-    //             setErrorMessage("Error: JWT token not found");
-    //             console.error("Error: JWT token not found");
-    //             return null;
-    //         }
-    //         else {
-    //             const response = await SecureGetHelper(["client_private_key", "server_public_key"], jwtToken);
-            
-    //             if (!response.success) {
-    //                 setErrorMessage(response.error || "Something went wrong");
-    //                 return null;
-    //             }
-
-    //             const { client_private_key, server_public_key } = response.data;
-
-    //             setClientPrivateKey(client_private_key);
-    //             setServerPublicKey(server_public_key);
-
-    //             return { client_private_key, server_public_key };
-    //         }
-
-    //     } catch (error) {
-    //         setErrorMessage("Error while fetching secrets");
-    //         console.error("Error while fetching secrets: ", error);
-    //         return null;
-    //     }
-    // }, [jwtToken]);
     
     const handleQRcode = useCallback(async (IPv4: string, region: string | null) => {
         if (!IPv4) {
@@ -301,7 +272,7 @@ const Home: React.FC = () => {
         }
 
         setLoading(false);
-    }, [keys, fetchKeys, jwtToken]);
+    }, [keys, fetchKeys, jwtToken, requestedKeys]);
     
     
     const handleCreateNewAccount = () => {
@@ -326,16 +297,6 @@ const Home: React.FC = () => {
     };
 
     useEffect(() => {
-        const fetchInitialKeys = async () => {
-        if (user && !keys) {
-            const token = await user.getIdToken();
-            await fetchKeys(requestedKeys, token);
-        }
-        };
-        fetchInitialKeys();
-    }, [user, keys, fetchKeys]);
-
-    useEffect(() => {
         if (configData && canvasRef.current) {
             QRCode.toCanvas(canvasRef.current, configData, {
                 width: 250,
@@ -346,15 +307,23 @@ const Home: React.FC = () => {
     }, [configData]);
 
     useEffect(() => {
-        const fetchLiveRegions = async () => {
-            const result = await getLiveRegions();
-            if (result) {
-                setLiveRegions(result); // assuming useState
+        const fetchInitialKeys = async () => {
+            if (user && !keys) {
+                const token = await user.getIdToken();
+                await fetchKeys(requestedKeys, token);
             }
         };
+        fetchInitialKeys();
+    }, [user, keys, fetchKeys, requestedKeys]);
 
-        fetchLiveRegions();
-    }, []);
+    useEffect(() => {
+        const fetchInitialLiveRegions = async () => {
+            if (user && !liveRegions) {
+                await fetchLiveRegions();
+            }
+        };
+        fetchInitialLiveRegions();
+    }, [user, liveRegions, fetchLiveRegions]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
