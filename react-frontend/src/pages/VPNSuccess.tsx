@@ -5,7 +5,8 @@ import QRCode from "qrcode";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { saveAs } from "file-saver";
-import { auth, onAuthStateChanged, signOut } from "../firebase";
+import { auth, onAuthStateChanged } from "../firebase";
+import { logout } from "../helpers/firebaseDbHelper";
 
 interface VPNSuccessState {
     region: string | null;
@@ -60,19 +61,13 @@ const VPNSuccess: React.FC = () => {
             const fetchUserData = async () => {
                 if (user) {
                 } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
+                    await logout(navigate);
                 }
             };
             fetchUserData();
         });
         return () => unsubscribe();
     }, [navigate]);
-    
-    const handleLogout = async () => {
-        await signOut(auth);
-        navigate("/", { replace: true });
-    };
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -85,7 +80,7 @@ const VPNSuccess: React.FC = () => {
                 />
                 <h1 className="text-xl font-semibold align-self-center">Success</h1>
                 <button 
-                onClick={handleLogout} 
+                onClick={async () => await logout(navigate)} 
                 className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
                 >
                 Logout

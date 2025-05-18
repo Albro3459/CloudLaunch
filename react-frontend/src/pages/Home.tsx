@@ -3,16 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
-import { ACTION, SecureGetHelper, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
-import { auth, getIdToken, onAuthStateChanged, signOut } from "../firebase";
+import { ACTION, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
+import { auth, getIdToken, onAuthStateChanged } from "../firebase";
 import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
 
 import { VPNTable, VPNTableEntry } from "../components/VPNTable";
-import { getUsersVPNs, VPNData } from "../helpers/firebaseDbHelper";
+import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
+import { useKeyStore } from "../stores/keyStore";
 
 export enum TOGGLE {
     ADD,
@@ -39,8 +40,10 @@ const Home: React.FC = () => {
     const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
-    const [clientPrivateKey, setClientPrivateKey] = useState<string | null>(null);
-    const [serverPublicKey, setServerPublicKey] = useState<string | null>(null);
+    const requestedKeys = ['client_private_key', 'server_public_key'];
+    const { keys, fetchKeys } = useKeyStore();
+    // const [clientPrivateKey, setClientPrivateKey] = useState<string | null>(null);
+    // const [serverPublicKey, setServerPublicKey] = useState<string | null>(null);
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -232,35 +235,35 @@ const Home: React.FC = () => {
     };
 
     // QR code functions
-    const secureGet = useCallback(async () => {
-        try {
-            if (!jwtToken) {
-                setErrorMessage("Error: JWT token not found");
-                console.error("Error: JWT token not found");
-                return null;
-            }
-            else {
-                const response = await SecureGetHelper(["client_private_key", "server_public_key"], jwtToken);
+    // const secureGet = useCallback(async () => {
+    //     try {
+    //         if (!jwtToken) {
+    //             setErrorMessage("Error: JWT token not found");
+    //             console.error("Error: JWT token not found");
+    //             return null;
+    //         }
+    //         else {
+    //             const response = await SecureGetHelper(["client_private_key", "server_public_key"], jwtToken);
             
-                if (!response.success) {
-                    setErrorMessage(response.error || "Something went wrong");
-                    return null;
-                }
+    //             if (!response.success) {
+    //                 setErrorMessage(response.error || "Something went wrong");
+    //                 return null;
+    //             }
 
-                const { client_private_key, server_public_key } = response.data;
+    //             const { client_private_key, server_public_key } = response.data;
 
-                setClientPrivateKey(client_private_key);
-                setServerPublicKey(server_public_key);
+    //             setClientPrivateKey(client_private_key);
+    //             setServerPublicKey(server_public_key);
 
-                return { client_private_key, server_public_key };
-            }
+    //             return { client_private_key, server_public_key };
+    //         }
 
-        } catch (error) {
-            setErrorMessage("Error while fetching secrets");
-            console.error("Error while fetching secrets: ", error);
-            return null;
-        }
-    }, [jwtToken]);
+    //     } catch (error) {
+    //         setErrorMessage("Error while fetching secrets");
+    //         console.error("Error while fetching secrets: ", error);
+    //         return null;
+    //     }
+    // }, [jwtToken]);
     
     const handleQRcode = useCallback(async (IPv4: string, region: string | null) => {
         if (!IPv4) {
@@ -270,18 +273,23 @@ const Home: React.FC = () => {
         }
 
         setLoading(true);
-
-        setIP(IPv4); setVpnRegion(region);
+        setIP(IPv4); 
+        setVpnRegion(region);
 
         // Cache the keys
-        let clientKey = clientPrivateKey;
-        let serverKey = serverPublicKey;
+        let clientKey = keys?.client_private_key || null;
+        let serverKey = keys?.server_public_key || null;
         if (!clientKey || !serverKey) {
-            const secrets = await secureGet();
-            if (secrets) {
-                clientKey = secrets.client_private_key;
-                serverKey = secrets.server_public_key;
+            if (!jwtToken) {
+                setErrorMessage("Error: JWT token not found");
+                console.error("Error: JWT token not found");
+                setLoading(false);
+                return;
             }
+
+            await fetchKeys(requestedKeys, jwtToken);
+            clientKey = useKeyStore.getState().keys?.client_private_key || null;
+            serverKey = useKeyStore.getState().keys?.server_public_key || null;
         }
         
         if (clientKey && serverKey) {
@@ -293,7 +301,7 @@ const Home: React.FC = () => {
         }
 
         setLoading(false);
-    }, [clientPrivateKey, serverPublicKey, secureGet]);
+    }, [keys, fetchKeys, jwtToken]);
     
     
     const handleCreateNewAccount = () => {
@@ -316,6 +324,16 @@ const Home: React.FC = () => {
             saveAs(blob, `wireguard.conf`);
         }
     };
+
+    useEffect(() => {
+        const fetchInitialKeys = async () => {
+        if (user && !keys) {
+            const token = await user.getIdToken();
+            await fetchKeys(requestedKeys, token);
+        }
+        };
+        fetchInitialKeys();
+    }, [user, keys, fetchKeys]);
 
     useEffect(() => {
         if (configData && canvasRef.current) {
@@ -353,19 +371,13 @@ const Home: React.FC = () => {
                         console.error("Error fetching JWT token:", error);
                     }
                 } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
+                    await logout(navigate);
                 }
             };
             fetchUserData();
         });
         return () => unsubscribe();
     }, [navigate, fillVPNs]);
-
-    const handleLogout = async () => {
-        await signOut(auth);
-        navigate("/", { replace: true });
-    };
 
     return (
         // <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -382,10 +394,10 @@ const Home: React.FC = () => {
                 </button>
                 <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
                 <button 
-                onClick={handleLogout} 
-                className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
+                    onClick={async () => await logout(navigate)} 
+                    className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
                 >
-                Logout
+                    Logout
                 </button>
             </nav>
             {errorMessage && (

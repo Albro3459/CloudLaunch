@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getIdToken, onAuthStateChanged, signOut } from "firebase/auth";
+import { getIdToken, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHouse } from "@fortawesome/free-solid-svg-icons";
 import { createUser, getUserRole } from "../helpers/usersHelper";
+import { logout } from "../helpers/firebaseDbHelper";
 
 const CreateUser: React.FC = () => {
     const navigate = useNavigate();
@@ -33,19 +34,13 @@ const CreateUser: React.FC = () => {
                         console.error("Error fetching JWT token:", error);
                     }
                 } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
+                    await logout(navigate);
                 }
             };
             fetchUserData();
         });
         return () => unsubscribe();
     }, [navigate]);
-
-    const handleLogout = async () => {
-        await signOut(auth);
-        navigate("/", { replace: true });
-    };
 
     const handleCreateAccount = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -110,7 +105,7 @@ const CreateUser: React.FC = () => {
                 />
                 <h1 className="text-xl font-semibold align-self-center">Create User</h1>
                 <button 
-                onClick={handleLogout} 
+                onClick={async () => await logout(navigate)} 
                 className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
                 >
                 Logout

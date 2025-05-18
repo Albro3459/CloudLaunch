@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword ,signOut, onAuthStateChanged, getIdToken } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, getIdToken } from "firebase/auth";
 
 import { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId } from "./Secrets/firebaseKeys";
 

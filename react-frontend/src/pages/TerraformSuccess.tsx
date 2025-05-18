@@ -2,7 +2,8 @@ import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
-import { auth, onAuthStateChanged, signOut } from "../firebase";
+import { auth, onAuthStateChanged } from "../firebase";
+import { logout } from "../helpers/firebaseDbHelper";
 
 interface TerraformSuccessState {
     region: string | null;
@@ -24,19 +25,13 @@ const TerraformSuccess: React.FC = () => {
                         navigate("/home", { replace: true });
                     }
                 } else {
-                    await signOut(auth);
-                    navigate("/", { replace: true });
+                    await logout(navigate);
                 }
             };
             fetchUserData();
         });
         return () => unsubscribe();
     }, [navigate, region]);
-    
-    const handleLogout = async () => {
-        await signOut(auth);
-        navigate("/", { replace: true });
-    };
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -49,7 +44,7 @@ const TerraformSuccess: React.FC = () => {
                 />
                 <h1 className="text-xl font-semibold align-self-center">Success</h1>
                 <button 
-                onClick={handleLogout} 
+                onClick={async () => await logout(navigate)} 
                 className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
                 >
                 Logout

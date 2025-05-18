@@ -1,7 +1,16 @@
 import { User } from "firebase/auth";
+import { auth, signOut } from "../firebase";
 import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { NavigateFunction } from "react-router-dom";
 
 import { getUserRole } from "./usersHelper";
+import { useKeyStore } from "../stores/keyStore";
+
+export const logout = async (navigate: NavigateFunction) => {
+    await signOut(auth);
+    useKeyStore.getState().clearKeys();
+    navigate("/", { replace: true });
+};
 
 export type VPNData = {
     userID: string;
