@@ -1,17 +1,19 @@
 import boto3
-from firebase import remove_live_region
+from firebase import batch_update_instance_statuses, map_users_to_instance_ids, remove_live_region
 
-def terminate_old_vpn_instances(region, tag_value='VPN-*'):
+def terminate_old_vpn_instances(region, name_prefix='VPN-'):
     ec2 = boto3.resource("ec2", region_name=region)
     client = boto3.client("ec2", region_name=region)
     filters = [
-        {"Name": "instance-state-name", "Values": ["running", "pending"]},
-        {"Name": "tag:Name", "Values": [tag_value]}
+        {"Name": "instance-state-name", "Values": ["running", "pending"]}
     ]
     instances_to_terminate = []
+    
     for instance in ec2.instances.filter(Filters=filters):
-        print(f"Marking for termination: {instance.id} ({instance.public_ip_address})")
-        instances_to_terminate.append(instance.id)
+        name_tag = next((tag['Value'] for tag in instance.tags if tag['Key'] == 'Name'), None)
+        if name_tag and name_tag.strip().startswith(name_prefix.strip()):
+            print(f"Marking for termination: {instance.id} ({instance.public_ip_address})")
+            instances_to_terminate.append(instance.id)
 
     if instances_to_terminate:
         ec2.instances.filter(InstanceIds=instances_to_terminate).terminate()
@@ -19,6 +21,16 @@ def terminate_old_vpn_instances(region, tag_value='VPN-*'):
         waiter = client.get_waiter('instance_terminated')
         waiter.wait(InstanceIds=instances_to_terminate)
         print("Confirmed instances are fully terminated.")
+        
+        region_instance_map = {region: instances_to_terminate}
+        
+        user_region_map = map_users_to_instance_ids(region_instance_map)
+        
+        for uid, user_map in user_region_map.items():
+            try:
+                batch_update_instance_statuses(uid, user_map, "Terminated")
+            except Exception as e:
+                print(f"Failed to update Firebase for user {uid}: {e}")
     else:
         print("No other instances to terminate.")
     return True
@@ -164,7 +176,7 @@ def cleanup_region(region, source_region, key_pair_name):
     # ORDER MATTERS
     
     print(f"Terminating EC2s in {region}")
-    A = terminate_old_vpn_instances(region, 'VPN-*')
+    A = terminate_old_vpn_instances(region, 'VPN-')
     
     print(f"Deregistering AMIs and deleting Snapshots in {region}")
     B = deregister_AMIs(ec2, 'VPN')
