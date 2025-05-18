@@ -99,7 +99,8 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { target_region, region_cleaned } = response.data;
+                // const { target_region, region_cleaned } = response.data;
+                const { target_region } = response.data;
 
                 if (!target_region) {
                     setErrorMessage(`Terraform of target region ${terraformRegion} failed`);
@@ -136,7 +137,8 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { target_region, region_cleaned } = response.data;
+                // const { target_region, region_cleaned } = response.data;
+                const { region_cleaned } = response.data;
 
                 if (!region_cleaned) {
                     setErrorMessage(`Cleaning region ${cleanRegion} failed`);
