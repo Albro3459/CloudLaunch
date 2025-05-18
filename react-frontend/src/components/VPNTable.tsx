@@ -26,9 +26,42 @@ const capitalized = (str: string) => {
     return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
+const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean) => {
+    return [...data].sort((a, b) => {
+        if (!sortField) return 0;
+        
+        let aVal = a[sortField as keyof VPNTableEntry];
+        let bVal = b[sortField as keyof VPNTableEntry];
+
+        if (sortField === "region") {
+            aVal = getRegionName(aVal as string | null) || "";
+            bVal = getRegionName(bVal as string | null) || "";
+        } else {
+            aVal = aVal || "";
+            bVal = bVal || "";
+        }
+
+        return sortAsc
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+    });
+};
+
 export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc }) => {
 
     const [showConfirm, setShowConfirm] = useState(false);
+
+    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortAsc, setSortAsc] = useState(true);
+
+    const handleSort = (field: string) => {
+        if (sortField === field) {
+            setSortAsc(!sortAsc);
+        } else {
+            setSortField(field);
+            setSortAsc(true);
+        }
+    };
 
     return (
         <div className="bg-white mt-8 p-6 rounded-2xl shadow-lg w-full max-w-4xl relative">
@@ -84,17 +117,27 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                             {isAdmin &&
                                 <>
                                     <th className="px-4 py-2 text-center">Terminate</th>
-                                    <th className="px-4 py-2 text-center">User</th>
+                                    <th 
+                                        className="px-4 py-2 text-center"
+                                        onClick={() => handleSort("email")}
+                                    >
+                                        User
+                                    </th>
                                 </>
                             }
-                            <th className="px-4 py-2 text-center">Region</th>
+                            <th 
+                                className="px-4 py-2 text-center"
+                                onClick={() => handleSort("region")}
+                            >
+                                Region
+                            </th>
                             <th className="px-4 py-2 text-center">Address</th>
                             <th className="px-4 py-2 text-center">Status</th>
                             <th className="px-4 py-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {data.map((entry, index) => (
+                        {sortedData(data, sortField, sortAsc).map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                                 {isAdmin &&
                                     <>
