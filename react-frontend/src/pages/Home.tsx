@@ -33,7 +33,6 @@ const Home: React.FC = () => {
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
     const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
-    // const [liveRegions, setLiveRegions] = useState<Region[] | null>();
 
     const [region, setRegion] = useState("");
     const [terraformRegion, setTerraformRegion] = useState("");

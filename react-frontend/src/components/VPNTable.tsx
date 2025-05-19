@@ -133,7 +133,7 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                             </th>
                             <th className="px-4 py-2 text-center">Address</th>
                             <th className="px-4 py-2 text-center">Status</th>
-                            <th className="px-4 py-2 text-center">Actions</th>
+                            <th className="px-4 py-2 text-center">Config</th>
                         </tr>
                     </thead>
                     <tbody>
