@@ -25,11 +25,54 @@ export type VPNData = {
 
 export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
 
-    if (await getUserRole(user) === "admin") {
-        return await getAdminVPNs(user);
-    }
+    // if (await getUserRole(user) === "admin") {
+    //     return await getAdminVPNs(user);
+    // }
 
-    return await getVPNs(user.uid, user.email);
+    // return await getVPNs(user.uid, user.email);
+    return [
+  {
+    userID: "user",
+    email: "example@email.com",
+    region: "us-west-1", // California
+    instanceID: "i-0abc123def456gh01",
+    ipv4: "52.53.125.178",
+    status: "Running"
+  },
+  {
+    userID: "user",
+    email: "example@email.com",
+    region: "ap-northeast-1", // Tokyo
+    instanceID: "i-0abc123def456gh02",
+    ipv4: "192.27.42.1",
+    status: "Running"
+  },
+  {
+    userID: "user",
+    email: "example@email.com",
+    region: "sa-east-1", // Brazil
+    instanceID: "i-0abc123def456gh03",
+    ipv4: "127.0.48.3",
+    status: "Running"
+  },
+  {
+    userID: "user",
+    email: "example@email.com",
+    region: "eu-central-1", // Germany
+    instanceID: "i-0abc123def456gh04",
+    ipv4: "58.121.2.124",
+    status: "Running"
+  },
+  {
+    userID: "user",
+    email: "example@email.com",
+    region: "af-south-1", // South Africa
+    instanceID: "i-0abc123def456gh05",
+    ipv4: "52.0.82.5",
+    status: "Running"
+  }
+];
+
 };
 
 const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]> => {

@@ -56,8 +56,7 @@ const CleanSuccess: React.FC = () => {
 
                 {region && region.length > 0 ? (
                     <p className="text-gray-700">
-                        Region{" "}
-                        { <b>{region}</b>} has been cleaned.
+                        {<b>{region}</b>} has been cleaned.
                     </p>
                 ) : (
                     <p className="text-gray-700">No region was cleaned.</p>

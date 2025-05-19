@@ -362,7 +362,7 @@ const Home: React.FC = () => {
                 >
                     About
                 </button>
-                <h1 className="text-xl font-semibold align-self-center">VPN Deployment</h1>
+                <h1 className="text-xl font-semibold align-self-center">CloudLaunch</h1>
                 <button 
                     onClick={async () => await logout(navigate)} 
                     className="cursor-pointer bg-gray-300 text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition absolute right-6"
@@ -539,7 +539,7 @@ const Home: React.FC = () => {
 
             {/* QR code overlay with download button */}
             {configData && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white p-6 rounded-2xl shadow-lg text-center relative max-w-md w-full">
                         <button
                             onClick={() => { setConfigData(null); setIP(null) }}

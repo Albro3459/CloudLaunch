@@ -51,7 +51,7 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
 
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortField, setSortField] = useState<string | null>("region");
     const [sortAsc, setSortAsc] = useState(true);
 
     const handleSort = (field: string) => {

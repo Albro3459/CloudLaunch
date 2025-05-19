@@ -59,7 +59,7 @@ const TerraformSuccess: React.FC = () => {
                         { <b>{region}</b>} is being terraformed for deployment.
                         <br></br>
                         <br></br>
-                        { <b>Be Patient: </b>}this process can take 5 - 10 minutes.
+                        { <b>Be Patient: </b>}This process can take 5 - 10 minutes.
                     </p>
                 ) : (
                     <p className="text-gray-700">No region was terraformed.</p>
