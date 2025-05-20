@@ -9,13 +9,13 @@
 
  * Live at: [cloudlaunch.live/](https://www.cloudlaunch.live/)
 
- * Instantly deploy a secure WireGuard VPN on an AWS EC2 instance in the region of your choice, pre-configured for IPv4, IPv6, and DNS.
+ * Instantly deploy a secure <b>WireGuard VPN</b> on an AWS EC2 instance in the region of your choice, pre-configured with IPv4, IPv6, and DNS.
 
- * The entire deployment process is automated using AWS Lambda, ensuring a fast, efficient, and hassle-free setup.
+ * The entire deployment process is automated using <b>AWS Lambda</b>, ensuring a fast, efficient, and hassle-free setup.
 
- * Generate your VPN configuration instantly, scan a QR code, or download the .conf file for easy setup on your devices. All in just a few clicks.
+ * Generate your VPN configuration instantly, scan a QR code, or download the <b>.conf</b> file for easy setup on your devices. All in just a few clicks.
 
- * Secure, simple, and instant. Your personal cloud VPN, deployed on demand with little to no setup needed.
+ * <b>Secure, simple, and instant.</b> Your personal cloud VPN, deployed on demand.
  
 ## Languages and Frameworks:
 * React with TypeScript and TailwindCSS for the Frontend
