@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 
 import { ACTION, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, getIdToken, onAuthStateChanged } from "../firebase";
-import { aws_regions, getRegionName } from "../helpers/regionsHelper";
+import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
 
@@ -14,7 +14,7 @@ import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
 import { useKeyStore } from "../stores/keyStore";
-import { useLiveRegionsStore } from "../stores/liveRegionsStore";
+// import { useLiveRegionsStore } from "../stores/liveRegionsStore";
 
 export enum TOGGLE {
     ADD,
@@ -32,7 +32,8 @@ const Home: React.FC = () => {
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
-    const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
+    // const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
+    const [liveRegions, setLiveRegions] = useState<Region[] | null>(); // Don't cache it anymore because it needs to update when things change
 
     const [region, setRegion] = useState("");
     const [terraformRegion, setTerraformRegion] = useState("");
@@ -317,14 +318,25 @@ const Home: React.FC = () => {
         fetchInitialKeys();
     }, [user, keys, fetchKeys, requestedKeys]);
 
+    // useEffect(() => {
+    //     const fetchInitialLiveRegions = async () => {
+    //         if (user && !liveRegions) {
+    //             await fetchLiveRegions();
+    //         }
+    //     };
+    //     fetchInitialLiveRegions();
+    // }, [user, liveRegions, fetchLiveRegions]);
     useEffect(() => {
         const fetchInitialLiveRegions = async () => {
-            if (user && !liveRegions) {
-                await fetchLiveRegions();
+            if (!liveRegions) {
+                const result = await getLiveRegions();
+                if (result) {
+                    setLiveRegions(result);
+                }
             }
         };
         fetchInitialLiveRegions();
-    }, [user, liveRegions, fetchLiveRegions]);
+    }, [liveRegions]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {

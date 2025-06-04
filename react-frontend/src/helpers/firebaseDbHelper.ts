@@ -5,12 +5,12 @@ import { NavigateFunction } from "react-router-dom";
 
 import { getUserRole } from "./usersHelper";
 import { useKeyStore } from "../stores/keyStore";
-import { useLiveRegionsStore } from "../stores/liveRegionsStore";
+// import { useLiveRegionsStore } from "../stores/liveRegionsStore";
 
 export const logout = async (navigate: NavigateFunction) => {
     await signOut(auth);
     useKeyStore.getState().clearKeys();
-    useLiveRegionsStore.getState().clearLiveRegions();
+    // useLiveRegionsStore.getState().clearLiveRegions();
     navigate("/", { replace: true });
 };
 
