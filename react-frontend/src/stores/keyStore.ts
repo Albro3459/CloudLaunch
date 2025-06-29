@@ -9,7 +9,23 @@ interface KeyStore {
   clearKeys: () => void;
 }
 
-export const useKeyStore = create<KeyStore>((set) => ({
+let activeFetch: Promise<void> | null = null;
+
+export const fetchKeys = async (requestedKeys: string[], token: string) : Promise<void> => {
+  const store = useKeyStore.getState();
+  if (activeFetch) return activeFetch; // Consumer can wait on the original fetch!!!
+  if (store.loading || store.keys) return;
+  
+  activeFetch = store.fetchKeys(requestedKeys, token);
+
+  try {
+    await activeFetch;
+  } finally {
+    activeFetch = null;
+  }
+};
+
+export const useKeyStore = create<KeyStore>((set, get) => ({
   keys: null,
   loading: false,
   error: null,

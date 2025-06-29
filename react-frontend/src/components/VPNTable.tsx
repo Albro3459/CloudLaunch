@@ -11,7 +11,6 @@ export type VPNTableEntry = {
     instanceID: string;
     ipv4: string;
     status: string;
-    onQrCodeClick: () => void;
 };
 
 type VPNTableData = {
@@ -20,6 +19,7 @@ type VPNTableData = {
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
     actionFunc: (targets: Targets) => void;
+    onQRCodeClick: (ipv4: string, region: string | null) => void;
 };
 
 const capitalized = (str: string) => {
@@ -47,7 +47,7 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
     });
 };
 
-export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc }) => {
+export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
 
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -137,7 +137,7 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedData(data, sortField, sortAsc).map((entry, index) => (
+                        {data?.length > 0 && sortedData(data, sortField, sortAsc).map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                                 {isAdmin &&
                                     <>
@@ -156,7 +156,8 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                                 <td className="px-4 py-2 text-center">{capitalized(entry.status)}</td>
                                 <td className="px-4 py-2 flex justify-center">
                                     <button
-                                        onClick={entry.onQrCodeClick}
+                                        onClick={() => onQRCodeClick(entry.ipv4, entry.region)}
+                                        // disabled={keyStore.loading || !keyStore.keys}
                                         className="text-blue-600 hover:text-blue-800"
                                     >
                                         <QrCode size={20} />

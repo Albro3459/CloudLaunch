@@ -4,7 +4,7 @@ import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
 import { ACTION, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
-import { auth, getIdToken, onAuthStateChanged } from "../firebase";
+import { auth, onAuthStateChanged } from "../firebase";
 import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 import { SOURCE_REGION } from "../Secrets/source_region";
@@ -13,7 +13,7 @@ import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
-import { useKeyStore } from "../stores/keyStore";
+import { fetchKeys, useKeyStore } from "../stores/keyStore";
 // import { useLiveRegionsStore } from "../stores/liveRegionsStore";
 
 export enum TOGGLE {
@@ -27,8 +27,6 @@ const Home: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const [user, setUser] = useState<User | null>(null);
-    const [email, setEmail] = useState<string | null>(null);
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
@@ -43,7 +41,7 @@ const Home: React.FC = () => {
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
     const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
-    const { keys, fetchKeys } = useKeyStore();
+    const { keys } = useKeyStore();
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -57,7 +55,7 @@ const Home: React.FC = () => {
                 console.error("Error: JWT token not found");
             }
             else {
-                const response = await VPNdeployHelper(ACTION.DEPLOY, null, email || "", region, jwtToken);
+                const response = await VPNdeployHelper(ACTION.DEPLOY, null, auth.currentUser?.email || "", region, jwtToken);
             
                 setLoading(false);
 
@@ -217,14 +215,10 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                // const { action_completed } = response.data;
-
-                // console.log("ACTION COMPLETED: ", action_completed);
-
                 setTargets({});
 
-                if (user) {
-                    await fillVPNs(user);
+                if (auth.currentUser) {
+                    await fillVPNs(auth.currentUser);
                 }
             }
 
@@ -249,32 +243,27 @@ const Home: React.FC = () => {
         setIP(IPv4); 
         setVpnRegion(region);
 
-        // Cache the keys
-        let clientKey = keys?.client_private_key || null;
-        let serverKey = keys?.server_public_key || null;
-        if (!clientKey || !serverKey) {
-            if (!jwtToken) {
-                setErrorMessage("Error: JWT token not found");
-                console.error("Error: JWT token not found");
-                setLoading(false);
-                return;
-            }
-
-            await fetchKeys(requestedKeys, jwtToken);
-            clientKey = useKeyStore.getState().keys?.client_private_key || null;
-            serverKey = useKeyStore.getState().keys?.server_public_key || null;
-        }
-        
-        if (clientKey && serverKey) {
-            const config = await generateConfig(clientKey, serverKey, IPv4);
-            setConfigData(config);
+        let clientKey, serverKey;
+        if (!keys) {
+            await fetchKeys(requestedKeys, await auth.currentUser?.getIdToken() ?? ""); // If fetching, it can wait on the original fetch and get updated! WOOO
+            const store = useKeyStore.getState();
+            clientKey = store.keys?.client_private_key || null;
+            serverKey = store.keys?.server_public_key || null;
         } else {
+            clientKey = keys.client_private_key || null;
+            serverKey = keys.server_public_key || null;
+        }
+
+        if (!clientKey || !serverKey) {
             setErrorMessage("Failed to retrieve keys for QR code.");
             console.error("Failed to retrieve keys for QR code.");
+        } else {
+            const config = await generateConfig(clientKey, serverKey, IPv4);
+            setConfigData(config);
         }
 
         setLoading(false);
-    }, [keys, fetchKeys, jwtToken, requestedKeys]);
+    }, [keys, requestedKeys]);
     
     
     const handleCreateNewAccount = () => {
@@ -309,48 +298,22 @@ const Home: React.FC = () => {
     }, [configData]);
 
     useEffect(() => {
-        const fetchInitialKeys = async () => {
-            if (user && !keys) {
-                const token = await user.getIdToken();
-                await fetchKeys(requestedKeys, token);
-            }
-        };
-        fetchInitialKeys();
-    }, [user, keys, fetchKeys, requestedKeys]);
-
-    // useEffect(() => {
-    //     const fetchInitialLiveRegions = async () => {
-    //         if (user && !liveRegions) {
-    //             await fetchLiveRegions();
-    //         }
-    //     };
-    //     fetchInitialLiveRegions();
-    // }, [user, liveRegions, fetchLiveRegions]);
-    useEffect(() => {
-        const fetchInitialLiveRegions = async () => {
-            if (!liveRegions) {
-                const result = await getLiveRegions();
-                if (result) {
-                    setLiveRegions(result);
-                }
-            }
-        };
-        fetchInitialLiveRegions();
-    }, [liveRegions]);
-
-    useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
                 if (user) {
-                    setUser(user);
+                    fillVPNs(user); // Not awaiting
+                    const token: string | null = await user.getIdToken();
+                    setJwtToken(token);
+                    
                     setRole(await getUserRole(user));
-                    setEmail(user.email);
-                    await fillVPNs(user);
-                    try {
-                        const token = await getIdToken(user);
-                        setJwtToken(token);
-                    } catch (error) {
-                        console.error("Error fetching JWT token:", error);
+                    
+                    fetchKeys(requestedKeys, token); // Not awaiting         
+
+                    if (!liveRegions) {
+                        const result = await getLiveRegions();
+                        if (result) {
+                            setLiveRegions(result);
+                        }
                     }
                 } else {
                     await logout(navigate);
@@ -359,7 +322,7 @@ const Home: React.FC = () => {
             fetchUserData();
         });
         return () => unsubscribe();
-    }, [navigate, fillVPNs]);
+    }, [navigate, fillVPNs, requestedKeys, liveRegions]);
 
     return (
         // <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -546,6 +509,7 @@ const Home: React.FC = () => {
                     targets={targets}
                     toggleTarget={toggleTarget}
                     actionFunc={handleTerminate}
+                    onQRCodeClick={handleQRcode}
                 />
             }
 
@@ -586,7 +550,7 @@ const Home: React.FC = () => {
             {/* Loading Overlay (Blocks clicks and dims background) */}
             {loading && (
                 <div className="fixed inset-0 w-full h-full bg-black/50 flex items-center justify-center z-50">
-                <div className="border-t-4 border-white border-solid rounded-full w-16 h-16 animate-spin"></div>
+                    <div className="border-t-4 border-white border-solid rounded-full w-16 h-16 animate-spin"></div>
                 </div>
             )}
         </div>
