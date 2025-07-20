@@ -8,6 +8,7 @@ import CreateUser from "./pages/CreateUser";
 import CreateUserSuccess from "./pages/CreateUserSuccess";
 import TerraformSuccess from "./pages/TerraformSuccess";
 import CleanSuccess from "./pages/CleanSuccess";
+import StreamTrackerPrivacyPolicy from "./pages/StreamTrackerPrivacyPolicy";
 
 const App: React.FC = () => {
   return (
@@ -22,6 +23,8 @@ const App: React.FC = () => {
         <Route path="/createUserSuccess" element={<CreateUserSuccess />} />
         <Route path="/terraformSuccess" element={<TerraformSuccess />} />
         <Route path="/cleanSuccess" element={<CleanSuccess />} />
+        
+        <Route path="/StreamTrackerPrivacyPolicy" element={<StreamTrackerPrivacyPolicy />} />
       </Routes>
     </Router>
   );
