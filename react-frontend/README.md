@@ -22,7 +22,13 @@ npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
 
 ### Deploy GitHub page:
 
-Push changes to main or dev, then:
+* NOTE: This uses the your local build code to deploy. It does NOT pull from any remote branch. It compiles your code to the build folder and deploys that. 
+    * Pro: Can be ran from any branch
+    * Con: Must be run locally and it can be confusing
+
+Push changes to main or dev.
+
+Then:
 ```sh
 cd react-frontend; 
 npm run deploy # Deploys to gh-pages branch

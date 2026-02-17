@@ -97,18 +97,21 @@ def get_users_instances(user_id, target_regions=None):
     
 def get_user_instances_in_region(user_id, role, region):
     # Returns 1+ VPNs (region_instance_map) in the requested region or None
-    if role == "admin":
-        usersIDs = get_all_user_ids()
+
+    # Commenting this out because the Admin doesn't want to get back another user's VPN, they only want their own.
+    # The Admin can see the other user's VPNs in the table
+    # if role == "admin":
+    #     usersIDs = get_all_user_ids()
         
-        for uid in usersIDs:
-            region_instances_map = get_users_instances(uid, [region])
-            if region_instances_map:
-                # Just need there to be at least 1 in the region
-                return region_instances_map
+    #     for uid in usersIDs:
+    #         region_instances_map = get_users_instances(uid, [region])
+    #         if region_instances_map:
+    #             # Just need there to be at least 1 in the region
+    #             return region_instances_map
             
-        return None
+    #     return None
     
-    else:
+    # else:
         region_instances = get_users_instances(user_id, [region])
         return region_instances if region_instances else None
 
