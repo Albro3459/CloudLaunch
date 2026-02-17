@@ -1,3 +1,4 @@
+// The Function URLs of the Lambdas
 export const AMI_WAITER_URL = "";
 export const DEPLOY_URL = "";
 export const SECURE_GET_URL = "";
