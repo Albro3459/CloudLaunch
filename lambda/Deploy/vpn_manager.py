@@ -81,7 +81,6 @@ def check_instance_type_supported_in_region(ec2, instance_type):
             f"{instance_type} is not supported in region {ec2.meta.region_name}"
         )
 
-# EC2 is already created for the target_region
 def deploy_instance(user_id, ec2, image_id, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
     
