@@ -8,7 +8,7 @@ from firebase import batch_update_instance_statuses, get_user_instances_in_regio
 from get_secrets import get_secret
 from notify import deliver_emails
 
-CLEANUP_VPNS = True
+CLEANUP_VPNS = False
 SOURCE_REGION = "us-west-1"
 SENDER="CloudLaunch <noreply@cloudlaunch.live>"
 ADMIN="brodsky.alex22@gmail.com"
