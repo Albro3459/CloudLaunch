@@ -200,22 +200,18 @@ def lambda_handler(event, context):
 
         # Deploy the EC2 instance
         result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
-        if not result:
+        if result["error"]:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": result["error"]})
+            }        
+        instance_id = result["instance_id"]
+        public_ip = result["public_ip"]
+
+        if not instance_id or not public_ip:
             return {
                 "statusCode": 500,
                 "body": json.dumps({"error": "Failed to deploy instance"})
-            }
-        instance_id, public_ip = result
-
-        if not public_ip:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": "Failed to retrieve instance public IP"})
-            }
-        if not instance_id:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": "Failed to retrieve instance ID"})
             }
             
         # Send emails
