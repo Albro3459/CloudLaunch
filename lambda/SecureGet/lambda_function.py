@@ -28,29 +28,14 @@ def lambda_handler(event, context):
     requested_keys = body.get("requested_keys", [])
 
     # Validate input
-    get_live_regions = isinstance(live_regions, bool)
+    get_live_regions = live_regions is True
     get_requested_keys = isinstance(requested_keys, list) and len(requested_keys) > 0
-    if not get_live_regions or not get_requested_keys:
-        if not get_live_regions:
-            print(f"Missing param: {live_regions}")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": f"Missing param"})
-            }
-        else:
-            print(f"Missing parameters: {requested_keys}")
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": f"Missing parameters"})
-            }
-        
-    # Fetch secrets
-    secrets = get_secret(f"wireguard/config/{SOURCE_REGION}", SOURCE_REGION)
-    if not secrets:
+    if not get_live_regions and not get_requested_keys:
         return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
+            "statusCode": 400,
+            "body": json.dumps({"error": "Invalid request"})
         }
+        
     firebaseSecrets = get_secret("FirebaseServiceAccount", SOURCE_REGION)
     if not firebaseSecrets:
         return {
@@ -67,6 +52,7 @@ def lambda_handler(event, context):
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
     
+     # If regions and keys are requested, prioritize regions
     if get_live_regions:
         # Fetch live regions
         instance_type = "t2.micro"
@@ -84,6 +70,14 @@ def lambda_handler(event, context):
 
     elif get_requested_keys:       
         # Get requested AWS Secrets
+        
+        secrets = get_secret(f"wireguard/config/{SOURCE_REGION}", SOURCE_REGION)
+        if not secrets:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
+            }
+
         result = {}
         for key in requested_keys:
             if key == "client_private_key":

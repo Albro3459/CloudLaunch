@@ -30,7 +30,7 @@ def supports_instance_in_region(region, instance_type):
                     "Values": [instance_type]
                 }
             ],
-            MaxResults=1  # We only care if at least one exists
+            MaxResults=5  # We only care if at least one exists, but 5 is the minimum
         )
 
         # If there are any results, then it is supported
