@@ -39,7 +39,8 @@ def get_available_instance_name(ec2, user_id):
     return f"{instance_name}-{num}"
 
 # Check if Image exists in the target region
-def check_image_exists(ec2, target_region, image_id):
+def check_image_exists(ec2, image_id):
+    target_region = ec2.meta.region_name or "unknown region"
     try:
         response = ec2.describe_images(
             Owners=["self"],
@@ -61,20 +62,58 @@ def check_image_exists(ec2, target_region, image_id):
     except KeyError:
         print(f"Unexpected response format when checking Image in {target_region}.")
         return f"Error checking Image in {target_region}"
+    
+def check_instance_type_supported_in_region(ec2, instance_type):
+    response = ec2.describe_instance_type_offerings(
+        LocationType="region",
+        Filters=[
+            {
+                "Name": "instance-type",
+                "Values": [instance_type]
+            }
+        ]
+    )
 
-def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, KeyName):
+    offerings = response.get("InstanceTypeOfferings", [])
+
+    if not offerings:
+        raise RuntimeError(
+            f"{instance_type} is not supported in region {ec2.meta.region_name}"
+        )
+
+def deploy_instance(user_id, ec2, image_id, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
     
     instanceName = get_available_instance_name(ec2, user_id)
     if not instanceName:
         # This will probably never get hit
-        print("No VPN name available.")
-        return None
+        error = "No VPN name available."
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
+    
+    instance_type = "t2.micro"
+    target_region = ec2.meta.region_name or "unknown region"
+
+    try:
+        # Check if t2.micro is supported in the region first
+        check_instance_type_supported_in_region(ec2, instance_type)
+    except Exception as e:
+        error = f"{instance_type} is not supported in {target_region}"
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
 
     try:
         response = ec2.run_instances(
             ImageId=image_id,
-            InstanceType="t2.micro",
+            InstanceType=instance_type,
             MinCount=1,
             MaxCount=1,
             SecurityGroupIds=[security_group_id],
@@ -106,22 +145,46 @@ def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, su
                     print(f"Instance {instance_id} has public IP: {public_ip}")
                     # Save the instance to firebase
                     add_instance_to_firebase(user_id, target_region, instance_id, public_ip, instanceName)
-                    return instance_id, public_ip
+                    return {
+                        "error": None,
+                        "instance_id": instance_id,
+                        "public_ip": public_ip
+                    }
             print("Waiting for public IP assignment...")
             time.sleep(interval)
         
-        print("Public IP address not assigned after retries.")
-        return None
+        error = "Public IP address not assigned after retries."
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
         
     except ClientError as e:
-        print(f"AWS ClientError: {e}")
-        return None
+        error = f"AWS ClientError: {e}"
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
     except BotoCoreError as e:
-        print(f"AWS Core Error: {e}")
-        return None
+        error = f"AWS Core Error: {e}"
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
     except Exception as e:
-        print(f"Unexpected error launching instance: {e}")
-        return None
+        error = f"Unexpected error launching instance: {e}"
+        print(error)
+        return {
+            "error": error,
+            "instance_id": None,
+            "public_ip": None
+        }
     
 ## Clean up
 def terminate_all_other_instances(LIVE_REGIONS):
