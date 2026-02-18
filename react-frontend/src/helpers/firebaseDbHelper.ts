@@ -11,6 +11,7 @@ export const logout = async (navigate: NavigateFunction) => {
     await signOut(auth);
     useKeyStore.getState().clearKeys();
     // useLiveRegionsStore.getState().clearLiveRegions();
+    // useAWSRegionsStore.getState().clearAWSRegions();
     navigate("/", { replace: true });
 };
 

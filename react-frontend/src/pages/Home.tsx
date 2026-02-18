@@ -14,6 +14,7 @@ import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
 import { fetchKeys, useKeyStore } from "../stores/keyStore";
+import { fetchAWSRegions, useAWSRegionsStore } from "../stores/awsRegionsStore";
 // import { useLiveRegionsStore } from "../stores/liveRegionsStore";
 
 export enum TOGGLE {
@@ -29,6 +30,8 @@ const Home: React.FC = () => {
 
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
+
+    const { AWSRegions } = useAWSRegionsStore();
 
     // const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
     const [liveRegions, setLiveRegions] = useState<Region[] | null>(); // Don't cache it anymore because it needs to update when things change
@@ -308,6 +311,7 @@ const Home: React.FC = () => {
                     setRole(await getUserRole(user));
                     
                     fetchKeys(requestedKeys, token); // Not awaiting         
+                    fetchAWSRegions(token); // Not awaiting         
 
                     if (!liveRegions) {
                         const result = await getLiveRegions();
@@ -438,13 +442,16 @@ const Home: React.FC = () => {
                             required
                             >
                             <option value="">Select a region</option>
-                            {liveRegions && liveRegions.length > 0 &&
-                            aws_regions.filter((region) => !liveRegions.map((r) => r.value).includes(region.value))
-                                .map((region) => (
-                                    <option key={region.value} value={region.value}>
-                                        {region.name}
-                                    </option>
-                                ))
+                            {liveRegions?.length && (
+                                AWSRegions?.length ? AWSRegions: aws_regions)
+                                    .filter((region) => !region.invalid && !liveRegions.map((r) => r.value)
+                                    .includes(region.value))
+                                    .map((region) => (
+                                        <option key={region.value} value={region.value}>
+                                            {region.name}
+                                        </option>
+                                    )
+                                )
                             }
                             </select>
                         </div>

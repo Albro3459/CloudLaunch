@@ -1,6 +1,47 @@
 import { AMI_WAITER_URL, DEPLOY_URL, SECURE_GET_URL, TERRAFORM_URL } from "../Secrets/API_URLs";
 
-export const SecureGetHelper = async (requested_keys: string[], token: string) => {
+export const SecureGetRegionsHelper = async (token: string) => {
+    try {
+        const myHeaders = new Headers();
+        myHeaders.append("Authorization", `Bearer ${token}`);
+        myHeaders.append("Content-Type", "application/json");
+
+        const raw = JSON.stringify({
+            "aws_regions": true
+        });
+
+        const requestOptions: RequestInit = {
+            method: "POST",
+            headers: myHeaders,
+            body: raw,
+            redirect: "follow"
+        };
+
+        const response = await fetch(SECURE_GET_URL, requestOptions);
+        const result = await response.json();
+
+        if (!response.ok) {
+            return {
+                success: false,
+                error: result?.error || `Error ${response.status}`
+            };
+        }
+
+        return {
+            success: true,
+            data: result
+        };
+        
+    } catch (error) {
+        console.error("Secure Get Regions API Error:", error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown Secure Get Regions API Error"
+        };
+    }
+};
+
+export const SecureGetKeysHelper = async (requested_keys: string[], token: string) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
@@ -33,10 +74,10 @@ export const SecureGetHelper = async (requested_keys: string[], token: string) =
         };
         
     } catch (error) {
-        console.error("Secure Get API Error:", error);
+        console.error("Secure Get Keys API Error:", error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : "Unknown Secure Get API Error"
+            error: error instanceof Error ? error.message : "Unknown Secure Get Keys API Error"
         };
     }
 };

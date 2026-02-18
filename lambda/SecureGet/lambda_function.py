@@ -9,7 +9,7 @@ SOURCE_REGION = "us-west-1"
 
 def lambda_handler(event, context):
     """
-    An API to securely get secrets and live regions from AWS
+    An API to securely get secrets and supported AWS regions from AWS
     """
     headers = event.get("headers", {})
     auth_header = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
@@ -24,13 +24,13 @@ def lambda_handler(event, context):
         }
 
     # Extract required values
-    live_regions = body.get("live_regions", False)
+    aws_regions = body.get("aws_regions", False)
     requested_keys = body.get("requested_keys", [])
 
     # Validate input
-    get_live_regions = live_regions is True
+    get_aws_regions = aws_regions is True
     get_requested_keys = isinstance(requested_keys, list) and len(requested_keys) > 0
-    if not get_live_regions and not get_requested_keys:
+    if not get_aws_regions and not get_requested_keys:
         return {
             "statusCode": 400,
             "body": json.dumps({"error": "Invalid request"})
@@ -53,8 +53,8 @@ def lambda_handler(event, context):
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
     
      # If regions and keys are requested, prioritize regions
-    if get_live_regions:
-        # Fetch live regions
+    if get_aws_regions:
+        # Fetch supported AWS regions
         instance_type = "t2.micro"
         
         supported_regions = get_supported_regions(instance_type)
