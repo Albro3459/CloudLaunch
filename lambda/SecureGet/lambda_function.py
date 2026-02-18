@@ -3,7 +3,7 @@ from firebase_admin import auth, firestore
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
-from aws import get_enabled_regions, supports_instance_in_region
+from aws import get_enabled_regions, supports_instance_in_region, get_supported_regions
 
 SOURCE_REGION = "us-west-1"
 
@@ -71,12 +71,7 @@ def lambda_handler(event, context):
         # Fetch live regions
         instance_type = "t2.micro"
         
-        regions = get_enabled_regions()
-        supported_regions = []
-
-        for r in regions:
-            if supports_instance_in_region(r, instance_type):
-                supported_regions.append(r)
+        supported_regions = get_supported_regions(instance_type)
 
         print(f"Instance type {instance_type} is supported in these regions:")
         for r in supported_regions:

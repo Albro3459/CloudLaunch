@@ -1,5 +1,7 @@
 import boto3
 
+_supported_regions_cache = {} # Can live across warm lambda invocations
+
 def get_enabled_regions():
     # Returns the AWS region names that are enabled
 
@@ -35,3 +37,20 @@ def supports_instance_in_region(region, instance_type):
     except Exception as e:
         print(f"Error checking if {region} supports {instance_type}: {e}")
         return False
+    
+def get_supported_regions(instance_type):
+    global _supported_regions_cache
+
+    if instance_type in _supported_regions_cache:
+        print("_supported_regions_cache cache HIT")
+        return _supported_regions_cache[instance_type]
+
+    regions = get_enabled_regions()
+    supported_regions = []
+
+    for r in regions:
+        if supports_instance_in_region(r, instance_type):
+            supported_regions.append(r)
+    
+    _supported_regions_cache[instance_type] = supported_regions
+    return supported_regions
