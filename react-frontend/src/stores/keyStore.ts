@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SecureGetHelper } from '../helpers/APIHelper';
+import { SecureGetKeysHelper } from '../helpers/APIHelper';
 
 interface KeyStore {
   keys: Record<string, any> | null;
@@ -33,7 +33,7 @@ export const useKeyStore = create<KeyStore>((set, get) => ({
   fetchKeys: async (requestedKeys, token) => {
     set({ loading: true, error: null });
 
-    const result = await SecureGetHelper(requestedKeys, token);
+    const result = await SecureGetKeysHelper(requestedKeys, token);
 
     if (result.success) {
       set({ keys: result.data, loading: false });

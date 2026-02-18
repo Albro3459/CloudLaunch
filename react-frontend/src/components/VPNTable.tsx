@@ -34,8 +34,8 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
         let bVal = b[sortField as keyof VPNTableEntry];
 
         if (sortField === "region") {
-            aVal = getRegionName(aVal as string | null) || "";
-            bVal = getRegionName(bVal as string | null) || "";
+            aVal = getRegionName(aVal);
+            bVal = getRegionName(bVal);
         } else {
             aVal = aVal || "";
             bVal = bVal || "";
