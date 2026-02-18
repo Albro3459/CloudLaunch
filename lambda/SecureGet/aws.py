@@ -1,4 +1,5 @@
 import boto3
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 _supported_regions_cache = {} # Can live across warm lambda invocations
 
@@ -48,9 +49,20 @@ def get_supported_regions(instance_type):
     regions = get_enabled_regions()
     supported_regions = []
 
-    for r in regions:
-        if supports_instance_in_region(r, instance_type):
-            supported_regions.append(r)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(supports_instance_in_region, r, instance_type): r
+            for r in regions
+        }
+
+        for future in as_completed(futures):
+            region = futures[future]
+            try:
+                if future.result():
+                    supported_regions.append(region)
+            except Exception as e:
+                print(f"Failure checking region {region}: {e}")
+                raise
     
     _supported_regions_cache[instance_type] = supported_regions
     return supported_regions
