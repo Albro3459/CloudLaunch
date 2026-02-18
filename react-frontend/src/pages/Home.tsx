@@ -328,6 +328,30 @@ const Home: React.FC = () => {
         return () => unsubscribe();
     }, [navigate, fillVPNs, requestedKeys, liveRegions]);
 
+    useEffect(() => {
+        if (!AWSRegions?.length) return;
+
+        setLiveRegions((liveRegions) => {
+            if (!liveRegions?.length) return null;
+            let changed: boolean = false;
+            const updated: Region[] = liveRegions.map(region => {
+                const invalid = !AWSRegions.some(y => y.value === region.value);
+                if (region.invalid !== invalid) {
+                    changed = true;
+                    const newRegion: Region = {
+                        ...region,
+                        invalid: invalid
+                    };
+                    return newRegion;
+                }
+                return region;
+            });
+
+            // Return updated regions if any were changed
+            return changed ? updated : liveRegions;
+        });
+    }, [AWSRegions]);
+
     return (
         // <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
         <div className={`flex flex-col items-center min-h-screen bg-gray-100 px-4 
@@ -393,7 +417,7 @@ const Home: React.FC = () => {
                     {liveRegions && liveRegions.length > 0 &&
                     liveRegions.map((region) => (
                         <option key={region.value} value={region.value}>
-                        {region.name}
+                        {region.name}{region.invalid ? ' - ⚠️ Unsupported' : ''}
                         </option>
                     ))}
                     </select>
@@ -411,11 +435,9 @@ const Home: React.FC = () => {
                 {/* Submit Button */}
                 <button
                     type="submit"
-                    // disabled={!region || !instanceName}
                     disabled={!region}
                     className={`w-full p-3 rounded-lg transition ${
                     region 
-                    // && instanceName
                         ? "cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-gray-400 text-gray-200 cursor-not-allowed"
                     }`}
@@ -486,7 +508,7 @@ const Home: React.FC = () => {
                             liveRegions.filter((region) => region.value !== SOURCE_REGION)
                                 .map((region) => (
                                     <option key={region.value} value={region.value}>
-                                        {region.name}
+                                        {region.name}{region.invalid ? ' - ⚠️ Unsupported' : ''}
                                     </option>
                                 ))
                             }

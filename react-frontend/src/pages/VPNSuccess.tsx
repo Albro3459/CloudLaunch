@@ -32,7 +32,6 @@ const VPNSuccess: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        // console.log(ip);
         if (client_private_key && server_public_key && ip) {
             const config = generateConfig(client_private_key, server_public_key, ip);
             setConfigData(config);

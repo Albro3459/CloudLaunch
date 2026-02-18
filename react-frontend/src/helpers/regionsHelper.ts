@@ -1,4 +1,5 @@
 import { collection, getDocs, getFirestore } from "firebase/firestore";
+import { useAWSRegionsStore } from "../stores/awsRegionsStore";
 
 // Fallback for AWSRegionsStore
 export const aws_regions: Region[] = [
@@ -38,8 +39,12 @@ export const getLiveRegions = async (): Promise<Region[] | null> => {
         const db = getFirestore();
         const querySnapshot = await getDocs(collection(db, "Live-Regions"));
         const regions: Region[] = [];
+
+        const _checkAWSRegions = useAWSRegionsStore.getState().AWSRegions;
+        const validAWSRegions = (_checkAWSRegions?.length ? _checkAWSRegions : aws_regions).filter(x => !x.invalid);
+
         querySnapshot.forEach((doc) => {
-          regions.push({ name: doc.data().name, value: doc.id });
+          regions.push({ name: doc.data().name, value: doc.id, invalid: !validAWSRegions.find(x => x.value === doc.id) });
         });
         return regions.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         
