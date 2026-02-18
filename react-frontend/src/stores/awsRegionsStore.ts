@@ -34,7 +34,6 @@ export const useAWSRegionsStore = create<AWSRegionsStore>((set) => ({
   fetchAWSRegions: async (token: string) => {
     set({ loading: true, error: null });
 
-    // console.log("FETCHING REGIONS");
     const result = await SecureGetRegionsHelper(token);
 
     if (result?.success) {
@@ -45,8 +44,6 @@ export const useAWSRegionsStore = create<AWSRegionsStore>((set) => ({
         }
         return region;
       });
-
-      // console.log("REGIONS FETCHED: ", JSON.stringify(result?.data));
 
       set({ AWSRegions: regions?.toSorted((a, b) => a.name.localeCompare(b.name)), loading: false });
     } else {
