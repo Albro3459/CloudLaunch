@@ -442,7 +442,7 @@ const Home: React.FC = () => {
                             required
                             >
                             <option value="">Select a region</option>
-                            {liveRegions?.length && (
+                            {!!liveRegions?.length && (
                                 AWSRegions?.length ? AWSRegions: aws_regions)
                                     .filter((region) => !region.invalid && !liveRegions.map((r) => r.value)
                                     .includes(region.value))
