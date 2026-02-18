@@ -169,7 +169,7 @@ def lambda_handler(event, context):
         ec2 = boto3.client("ec2", region_name=target_region)
 
         # Check if Image exists
-        image_id = check_image_exists(ec2, target_region, vpn_image_id)
+        image_id = check_image_exists(ec2, vpn_image_id)
         if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
             return {
                 "statusCode": 500,
@@ -199,7 +199,7 @@ def lambda_handler(event, context):
             terminate_all_other_instances(live_regions)
 
         # Deploy the EC2 instance
-        result = deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, key_name)
+        result = deploy_instance(user_id, ec2, image_id, security_group_id, subnet_id, key_name)
         if result["error"]:
             return {
                 "statusCode": 500,

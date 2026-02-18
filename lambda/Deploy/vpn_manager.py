@@ -39,7 +39,8 @@ def get_available_instance_name(ec2, user_id):
     return f"{instance_name}-{num}"
 
 # Check if Image exists in the target region
-def check_image_exists(ec2, target_region, image_id):
+def check_image_exists(ec2, image_id):
+    target_region = ec2.meta.region_name or "unknown region"
     try:
         response = ec2.describe_images(
             Owners=["self"],
@@ -81,7 +82,7 @@ def check_instance_type_supported_in_region(ec2, instance_type):
         )
 
 # EC2 is already created for the target_region
-def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, subnet_id, KeyName):
+def deploy_instance(user_id, ec2, image_id, security_group_id, subnet_id, KeyName):
     """Deploy an EC2 instance and return its public IP address."""
     
     instanceName = get_available_instance_name(ec2, user_id)
@@ -96,6 +97,7 @@ def deploy_instance(user_id, ec2, target_region, image_id, security_group_id, su
         }
     
     instance_type = "t2.micro"
+    target_region = ec2.meta.region_name or "unknown region"
 
     try:
         # Check if t2.micro is supported in the region first
