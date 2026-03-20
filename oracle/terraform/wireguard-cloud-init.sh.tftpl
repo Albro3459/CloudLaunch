@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Terraform renders this template, then cloud-init runs the resulting shell script.
+
+# Exit 1 immediately if anything fails
+set -euxo pipefail
+
+# Redirect stdout and stderr to log files
+exec > >(tee -a /var/log/wireguard-bootstrap.log | logger -t wireguard-bootstrap -s 2>/dev/console) 2>&1
+
+# We are on Ubuntu, but Ubuntu is a fork off of Debian, so need to set this var still
+export DEBIAN_FRONTEND=noninteractive
+
+WG_INTERFACE="${wg_interface}"
+LISTEN_PORT="${listen_port}"
+WG_ADDRESS_V4="${wg_address_v4}"
+WG_ADDRESS_V6="${wg_address_v6}"
+WG_NETWORK_V4="${wg_network_v4}"
+WG_NETWORK_V6="${wg_network_v6}"
+SERVER_PRIVATE_KEY="${server_private_key}"
+RATE_LIMIT="${rate_limit}"
+RATE_LIMIT_BURST="${rate_limit_burst}"
+PRIMARY_IFACE="$(ip route show default | awk '/default/ { print $5; exit }')"
+
+if [[ -z "$PRIMARY_IFACE" ]]; then
+  echo "Unable to determine the primary network interface" >&2
+  exit 1
+fi
+
+apt-get update
+apt-get install -y wireguard iptables
+
+# Essentially mkdir -p /etc/wireguard && chmod 700 /etc/wireguard
+install -d -m 700 /etc/wireguard
+install -d -m 755 /etc/sysctl.d
+
+# IP forwarding
+cat > /etc/sysctl.d/99-wireguard-forwarding.conf <<'SYSCTL'
+net.ipv4.ip_forward = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+net.ipv6.conf.lo.disable_ipv6 = 0
+SYSCTL
+
+# Apply IP forwarding changes
+sysctl --system
+
+# Create Wireguard config
+cat > "/etc/wireguard/$WG_INTERFACE.conf" <<WGCONF
+[Interface]
+Address = $WG_ADDRESS_V4, $WG_ADDRESS_V6
+ListenPort = $LISTEN_PORT
+PrivateKey = $SERVER_PRIVATE_KEY
+PostUp = iptables -A FORWARD -i $WG_INTERFACE -j ACCEPT; iptables -A FORWARD -o $WG_INTERFACE -j ACCEPT; iptables -t nat -A POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE; ip6tables -t nat -A POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE; iptables -A INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT; iptables -A INPUT -p udp --dport $LISTEN_PORT -j DROP
+PostDown = iptables -D FORWARD -i $WG_INTERFACE -j ACCEPT; iptables -D FORWARD -o $WG_INTERFACE -j ACCEPT; iptables -t nat -D POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE; ip6tables -t nat -D POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE; iptables -D INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT; iptables -D INPUT -p udp --dport $LISTEN_PORT -j DROP
+
+[Peer]
+PublicKey = ${peer.public_key}
+AllowedIPs = ${peer.allowed_ipv4}, ${peer.allowed_ipv6}
+PersistentKeepalive = ${peer.persistent_keepalive}
+WGCONF
+
+chmod 600 "/etc/wireguard/$WG_INTERFACE.conf"
+
+printf '%s\n' "$(printf '%s' "$SERVER_PRIVATE_KEY" | wg pubkey)" > "/etc/wireguard/$WG_INTERFACE.publickey"
+chmod 600 "/etc/wireguard/$WG_INTERFACE.publickey"
+
+# Start Wireguard
+systemctl enable --now "wg-quick@$WG_INTERFACE"
+
+# Status check (coalesce because fail would end the script when this is just a status check)
+systemctl --no-pager --full status "wg-quick@$WG_INTERFACE" || true
+wg show || true
+
+echo "WireGuard public key:"
+cat "/etc/wireguard/$WG_INTERFACE.publickey"

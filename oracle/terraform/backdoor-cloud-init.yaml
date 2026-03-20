@@ -1,0 +1,23 @@
+#cloud-config
+
+# Creates a 'backdoor' user in case you get locked out without an SSH key.
+# This user can only be used through the Cloud Shell
+# How to use:
+#   * OCI Instances
+#   * -> Click your instance
+#   * -> OS Management tab
+#   * -> See 'Console connection'
+#   * -> 'Launch Cloud Shell connection'
+#   * -> Once it finishes loading, hit the enter key, see 'streamtrack login: ', enter your password you used to generate
+
+users:
+  - default
+  - name: backdoor
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    passwd: ${hashed_password} # Create your password with 'openssl passwd -6'
+
+# Blocks ssh for this user. Can only be used with the Cloud Shell login
+runcmd:
+  - echo "DenyUsers backdoor" >> /etc/ssh/sshd_config
+  - systemctl restart ssh || systemctl restart sshd
