@@ -50,6 +50,7 @@ install -d -m 755 /etc/fail2ban/jail.d
 echo "==> Step 3/7: Hardening SSH access"
 SSHD_BACKUP="/etc/ssh/sshd_config.bak.$(date +%F_%H-%M-%S)"
 cp /etc/ssh/sshd_config "$SSHD_BACKUP"
+install -d -m 755 /run/sshd
 
 cat > /etc/ssh/sshd_config.d/99-cloudlaunch-hardening.conf <<'SSHCONF'
 PasswordAuthentication no
@@ -57,7 +58,7 @@ PermitRootLogin no
 SSHCONF
 
 sshd -t
-systemctl reload ssh || systemctl reload sshd
+systemctl reload-or-restart ssh || systemctl reload-or-restart sshd || systemctl start ssh
 sshd -T | grep -E '^(passwordauthentication|permitrootlogin) ' || true
 
 echo "==> Step 4/7: Configuring fail2ban"
