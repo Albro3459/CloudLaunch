@@ -27,13 +27,49 @@ if [[ -z "$PRIMARY_IFACE" ]]; then
   exit 1
 fi
 
+echo "==> Step 1/7: Installing required packages"
 apt-get update
-apt-get install -y wireguard iptables
+apt-get install -y wireguard iptables fail2ban
 
+echo "==> Step 2/7: Preparing configuration directories"
 # Essentially mkdir -p /etc/wireguard && chmod 700 /etc/wireguard
 install -d -m 700 /etc/wireguard
 install -d -m 755 /etc/sysctl.d
+install -d -m 755 /etc/ssh/sshd_config.d
+install -d -m 755 /etc/fail2ban/jail.d
 
+echo "==> Step 3/7: Hardening SSH access"
+SSHD_BACKUP="/etc/ssh/sshd_config.bak.$(date +%F_%H-%M-%S)"
+cp /etc/ssh/sshd_config "$SSHD_BACKUP"
+
+cat > /etc/ssh/sshd_config.d/99-cloudlaunch-hardening.conf <<'SSHCONF'
+PasswordAuthentication no
+PermitRootLogin no
+SSHCONF
+
+sshd -t
+systemctl reload ssh || systemctl reload sshd
+sshd -T | grep -E '^(passwordauthentication|permitrootlogin) ' || true
+
+echo "==> Step 4/7: Configuring fail2ban"
+cat > /etc/fail2ban/jail.d/sshd.local <<'FAIL2BAN'
+[sshd]
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+backend = systemd
+maxretry = 5
+findtime = 10m
+bantime = 1h
+FAIL2BAN
+
+systemctl enable fail2ban
+systemctl restart fail2ban
+systemctl --no-pager --full status fail2ban || true
+fail2ban-client status || true
+fail2ban-client status sshd || true
+
+echo "==> Step 5/7: Enabling IP forwarding"
 # IP forwarding
 cat > /etc/sysctl.d/99-wireguard-forwarding.conf <<'SYSCTL'
 net.ipv4.ip_forward = 1
@@ -46,6 +82,7 @@ SYSCTL
 # Apply IP forwarding changes
 sysctl --system
 
+echo "==> Step 6/7: Writing WireGuard configuration"
 # Create Wireguard config
 cat > "/etc/wireguard/$WG_INTERFACE.conf" <<WGCONF
 [Interface]
@@ -66,6 +103,7 @@ chmod 600 "/etc/wireguard/$WG_INTERFACE.conf"
 printf '%s\n' "$(printf '%s' "$SERVER_PRIVATE_KEY" | wg pubkey)" > "/etc/wireguard/$WG_INTERFACE.publickey"
 chmod 600 "/etc/wireguard/$WG_INTERFACE.publickey"
 
+echo "==> Step 7/7: Starting WireGuard"
 # Start Wireguard
 systemctl enable --now "wg-quick@$WG_INTERFACE"
 
@@ -75,3 +113,4 @@ wg show || true
 
 echo "WireGuard public key:"
 cat "/etc/wireguard/$WG_INTERFACE.publickey"
+echo "==> Bootstrap complete"

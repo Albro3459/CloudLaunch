@@ -1,5 +1,13 @@
 provider "oci" {}
 
+terraform {
+  required_providers {
+    oci = {
+      source = "oracle/oci"
+    }
+  }
+}
+
 variable "availability_domain" {
 	type = string
 	description = "OCI availability domain, for example xJLJ:US-SANJOSE-1-AD-1"

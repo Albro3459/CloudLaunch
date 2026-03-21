@@ -1,80 +1,154 @@
-# Oracle WireGuard Bootstrap
+# Oracle WireGuard Stack
 
-This folder contains a Terraform-ready bootstrap template for standing up a WireGuard server on an OCI instance with cloud-init user data.
+This folder contains the Oracle Cloud Infrastructure Terraform package used to launch a WireGuard VPN instance with cloud-init bootstrap scripts.
 
-TODO:
-* ingress and egress rules needed!
-```
-UDP 51820 ingress
-SSH ingress
-egress to 0.0.0.0/0 and ::/0
-VCN/subnet IPv6 enabled and routed
-```
-* set all vars
+The Terraform [cloudlaunch.tf](terraform/cloudlaunch.tf) creates the compute instance only. It assumes the subnet, IPv6 setup, route tables, and security rules already exist.
+
+## Prerequisites
+
+Before creating or updating the stack, make sure OCI already has:
+
+* a target compartment
+* a subnet for the instance
+* IPv6 enabled and routed if you want IPv6 VPN traffic
+* ingress for SSH on TCP `22` set to only your approved personal `IPv4/32`
+* ingress for WireGuard on UDP `51820`
+    * IPv4: `0.0.0.0/0`
+    * IPv6: `::/0`
+* egress that allows VPN client traffic out to `0.0.0.0/0` and `::/0`
 
 ## Files
 
-`wireguard-cloud-init.sh.tftpl`
+[cloudlaunch.tf](terraform/cloudlaunch.tf)
 
-* Installs WireGuard on Ubuntu.
+* Main Terraform file.
+* Declares the input variables.
+* Renders the cloud-init templates.
+* Creates the OCI compute instance and passes SSH keys plus multipart `user_data`.
+
+[wireguard-cloud-init.sh.tftpl](terraform/wireguard-cloud-init.sh.tftpl)
+
+* Shell script template rendered by Terraform and run by cloud-init.
+* Installs WireGuard, `iptables`, and `fail2ban`.
+* Disables SSH password auth and root SSH login.
 * Enables IPv4 and IPv6 forwarding.
-* Writes `/etc/wireguard/wg0.conf`.
-* Detects the instance's primary NIC automatically instead of hard-coding `eth0`.
-* Starts and enables `wg-quick`.
+* Writes `/etc/wireguard/<interface>.conf`.
+* Starts `wg-quick@<interface>`.
+* Writes step markers into `/var/log/wireguard-bootstrap.log` so bootstrap failures are easier to pinpoint.
 
-## Terraform example
+[backdoor-cloud-init.yaml](terraform/backdoor-cloud-init.yaml)
 
-OCI instance user data is passed through the `metadata` map, and the value should be base64 encoded. Oracle's Terraform provider documents both the `metadata` field on `oci_core_instance` and cloud-init usage through `user_data`:
+* Cloud-init config that creates the emergency `backdoor` user.
+* Sets the password hash from Terraform input.
+* Appends `DenyUsers backdoor` to SSH config so this user cannot log in over SSH.
+* Intended only for console access through OCI when normal SSH access is unavailable.
 
-* [OCI Terraform provider: `oci_core_instance`](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_instance)
-* [OCI docs: Launching an instance with cloud-init](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/launchinginstance.htm)
+[terraform.tfvars.example](terraform/terraform.tfvars.example)
 
-```hcl
-locals {
-  wireguard_user_data = templatefile("${path.module}/oracle/wireguard-cloud-init.sh.tftpl", {
-    wg_interface      = "wg0"
-    listen_port       = 51820
-    wg_address_v4     = "10.0.0.1/24"
-    wg_address_v6     = "fd42:42:42::1/64"
-    wg_network_v4     = "10.0.0.0/24"
-    wg_network_v6     = "fd42:42:42::/64"
-    rate_limit        = "25/second"
-    rate_limit_burst  = 100
-    server_private_key = var.wireguard_server_private_key
-    peer = {
-      public_key           = var.wireguard_client_public_key
-      allowed_ipv4         = "10.0.0.2/32"
-      allowed_ipv6         = "fd42:42:42::2/128"
-      persistent_keepalive = 25
-    }
-  })
-}
+* Example values for all required Terraform inputs.
+* Use this as the template when creating or updating your real `terraform.tfvars`.
 
-resource "oci_core_instance" "vpn" {
-  availability_domain = var.availability_domain
-  compartment_id      = var.compartment_id
-  display_name        = "wireguard-vpn"
-  shape               = var.shape
+[terraform.tfvars](terraform/terraform.tfvars)
 
-  create_vnic_details {
-    subnet_id        = var.subnet_id
-    assign_public_ip = true
-  }
+* Real stack values for this environment.
+* Contains sensitive values such as the WireGuard private key and password hash.
+* If you package this file into the stack zip, those values become part of the uploaded stack artifact.
 
-  metadata = {
-    user_data = base64encode(local.wireguard_user_data)
-  }
+[.terraform.lock.hcl](terraform/.terraform.lock.hcl)
 
-  source_details {
-    source_type = "image"
-    source_id   = var.image_id
-  }
-}
+* Terraform dependency lock file.
+* Useful for local reproducibility.
+* Not required in the zip you upload to OCI Stacks.
+
+## Backdoor User
+
+The `backdoor` user exists only as an emergency recovery path.
+
+What it does:
+
+* account name: `backdoor`
+* password login is allowed on the local console because cloud-init sets the provided password hash
+* password login over SSH is blocked because the bootstrap disables SSH password authentication globally and the cloud-init file adds `DenyUsers backdoor`
+* `sudo` is passwordless so you can recover access if your normal SSH path is broken
+
+How to use it:
+
+1. Open the OCI instance.
+2. Go to the console connection / Cloud Shell style serial login flow.
+3. Log in as `backdoor` with the password that matches the `hashed_password` Terraform input.
+
+This user is for recovery only.
+
+## Local Validation
+
+```sh
+cd terraform &&
+terraform init &&
+terraform validate
 ```
 
-## Notes
+What these do:
 
-* Keep the WireGuard private key in Terraform variables or a secret source, not in git.
-* The client public key from the original doc is intentionally not committed here.
-* You still need OCI ingress rules for UDP `51820` and SSH, plus egress that allows the VPN traffic out.
-* The bootstrap log lands in `/var/log/wireguard-bootstrap.log` on the instance.
+* `terraform init` downloads the OCI provider and prepares the local working directory
+* `terraform validate` checks Terraform syntax, type usage, and provider schema compatibility
+
+Useful notes:
+
+* `.terraform/` is local init output and should not be committed
+* `terraform validate` requires `terraform init` first on a clean machine
+* if you change provider-related settings later, rerun `terraform init`
+
+## Creating Or Updating The OCI Stack
+
+When uploading to OCI Stacks, zip only the files Resource Manager actually needs.
+
+Include:
+
+* [cloudlaunch.tf](terraform/cloudlaunch.tf)
+* [wireguard-cloud-init.sh.tftpl](terraform/wireguard-cloud-init.sh.tftpl)
+* [backdoor-cloud-init.yaml](terraform/backdoor-cloud-init.yaml)
+* [terraform.tfvars](terraform/terraform.tfvars)
+
+Do not include:
+
+* `.terraform/`
+* local provider binaries
+* editor files
+* logs
+* example env
+* any other local scratch files
+
+Usually you do not need to include [.terraform.lock.hcl](terraform/.terraform.lock.hcl) for OCI Stacks.
+
+Example packaging flow from repo root:
+
+```sh
+cd terraform &&
+STACK_TMP="/tmp/cloudlaunch-stack-$(date +%F_%H-%M-%S)" &&
+mkdir -p "$STACK_TMP" &&
+cp cloudlaunch.tf "$STACK_TMP"/ &&
+cp wireguard-cloud-init.sh.tftpl "$STACK_TMP"/ &&
+cp backdoor-cloud-init.yaml "$STACK_TMP"/ &&
+cp terraform.tfvars "$STACK_TMP"/ &&
+cd "$STACK_TMP" &&
+zip -r ~/Desktop/cloudlaunch-stack.zip . &&
+cd - && cd ../
+```
+
+Then in OCI Stacks:
+
+1. Create a new stack or edit the existing one.
+2. Upload the zip.
+3. Review the variables OCI detects.
+4. Plan/apply the stack.
+
+If you prefer to manage variables in the OCI stack UI instead of packaging them, leave `terraform.tfvars` out of the zip and set the variables directly in the stack.
+
+## Runtime Logs
+
+After the instance launches, useful logs on the VM are:
+
+* `/var/log/cloud-init-output.log`
+* `/var/log/wireguard-bootstrap.log`
+
+The WireGuard bootstrap log includes explicit step markers so it is easier to see whether failure happened during package install, SSH hardening, `fail2ban`, sysctl setup, or WireGuard startup.
