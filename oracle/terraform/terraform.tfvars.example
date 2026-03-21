@@ -9,7 +9,7 @@ ssh_authorized_keys = [
     "ssh-rsa ... example"
 ]
 
-instance_display_name   = "CloudLaunch-VPN"
+instance_display_name   = "CloudLaunch"
 vnic_display_name       = "CloudLaunch"
 ipv6_subnet_cidr        = "2603:c024:c01a:8b69::/64"
 shape                   = "VM.Standard.A1.Flex"

@@ -4,6 +4,8 @@ This folder contains the Oracle Cloud Infrastructure Terraform package used to l
 
 The Terraform [cloudlaunch.tf](terraform/cloudlaunch.tf) creates the compute instance only. It assumes the subnet, IPv6 setup, route tables, and security rules already exist.
 
+If you want to create another VPN without replacing the instance tracked by the current stack, use the separate package in [terraform-additional](/Users/alexbrodsky/GitHub/CloudLaunch/oracle/terraform-additional). Upload that directory as a different OCI stack so it gets its own Terraform state.
+
 ## Prerequisites
 
 Before creating or updating the stack, make sure OCI already has:
@@ -59,6 +61,12 @@ Before creating or updating the stack, make sure OCI already has:
 * Terraform dependency lock file.
 * Useful for local reproducibility.
 * Not required in the zip you upload to OCI Stacks.
+
+[terraform-additional](terraform-additional)
+
+* Separate standalone Terraform package for creating another VPN instance in a different OCI stack.
+* Intended for parallel instances so you do not replace the one managed by [terraform](terraform).
+* Starts with different example display names and WireGuard address ranges so you have a safer baseline when cloning a second VPN.
 
 ## Backdoor User
 
@@ -150,5 +158,12 @@ After the instance launches, useful logs on the VM are:
 
 * `/var/log/cloud-init-output.log`
 * `/var/log/wireguard-bootstrap.log`
+
+Check with 
+```sh
+sudo sed -n '1,240p' /var/log/wireguard-bootstrap.log
+# or
+tail -f /var/log/wireguard-bootstrap.log
+```
 
 The WireGuard bootstrap log includes explicit step markers so it is easier to see whether failure happened during package install, SSH hardening, `fail2ban`, sysctl setup, or WireGuard startup.
