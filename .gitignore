@@ -13,3 +13,4 @@ node_modules
 !**/*.tfvars.example
 !**/*.auto.tfvars.example
 oracle/terraform/.terraform/providers/registry.terraform.io/hashicorp/oci/8.6.0/darwin_arm64/terraform-provider-oci_v8.6.0
+vm_dump.md
