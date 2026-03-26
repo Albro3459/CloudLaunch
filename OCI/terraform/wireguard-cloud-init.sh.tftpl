@@ -99,8 +99,21 @@ cat > "/etc/wireguard/$WG_INTERFACE.conf" <<WGCONF
 Address = $WG_ADDRESS_V4, $WG_ADDRESS_V6
 ListenPort = $LISTEN_PORT
 PrivateKey = $SERVER_PRIVATE_KEY
-PostUp   = iptables -I FORWARD 1 -i $WG_INTERFACE -j ACCEPT; iptables -I FORWARD 2 -o $WG_INTERFACE -j ACCEPT; iptables -t nat -A POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE; ip6tables -t nat -A POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE; iptables -I INPUT 1 -p udp --dport $LISTEN_PORT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT; iptables -I INPUT 2 -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT; iptables -I INPUT 3 -p udp --dport $LISTEN_PORT -j DROP
-PostDown = iptables -D FORWARD -i $WG_INTERFACE -j ACCEPT; iptables -D FORWARD -o $WG_INTERFACE -j ACCEPT; iptables -t nat -D POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE; ip6tables -t nat -D POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE; iptables -D INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT; iptables -D INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT; iptables -D INPUT -p udp --dport $LISTEN_PORT -j DROP
+PostUp = iptables -I FORWARD 1 -i $WG_INTERFACE -j ACCEPT
+PostUp = iptables -I FORWARD 2 -o $WG_INTERFACE -j ACCEPT
+PostUp = iptables -t nat -A POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE
+PostUp = ip6tables -t nat -A POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE
+PostUp = iptables -I INPUT 1 -p udp --dport $LISTEN_PORT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+PostUp = iptables -I INPUT 2 -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT
+PostUp = iptables -I INPUT 3 -p udp --dport $LISTEN_PORT -j DROP
+
+PostDown = iptables -D FORWARD -i $WG_INTERFACE -j ACCEPT
+PostDown = iptables -D FORWARD -o $WG_INTERFACE -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s $WG_NETWORK_V4 -o $PRIMARY_IFACE -j MASQUERADE
+PostDown = ip6tables -t nat -D POSTROUTING -s $WG_NETWORK_V6 -o $PRIMARY_IFACE -j MASQUERADE
+PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -m conntrack --ctstate NEW -m limit --limit $RATE_LIMIT --limit-burst $RATE_LIMIT_BURST -j ACCEPT
+PostDown = iptables -D INPUT -p udp --dport $LISTEN_PORT -j DROP
 
 [Peer]
 PublicKey = ${peer.public_key}
