@@ -3,7 +3,7 @@ export const generateConfig = (CLIENT_PRIVATE_KEY: string, SERVER_PUBLIC_KEY: st
 `[Interface]
 PrivateKey = ${CLIENT_PRIVATE_KEY}
 Address = 10.0.0.2/24, fd42:42:42::2/64
-DNS = 1.1.1.1, 2606:4700:4700::1111
+DNS = 10.0.0.1, fd42:42:42::1
 
 [Peer]
 PublicKey = ${SERVER_PUBLIC_KEY}

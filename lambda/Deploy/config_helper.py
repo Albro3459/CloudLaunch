@@ -7,7 +7,7 @@ def get_config(client_private_key, server_public_key, ip_address):
     config = f"""[Interface]
 PrivateKey = {client_private_key}
 Address = 10.0.0.2/24, fd42:42:42::2/64
-DNS = 1.1.1.1, 2606:4700:4700::1111
+DNS = 10.0.0.1, fd42:42:42::1
 
 [Peer]
 PublicKey = {server_public_key}

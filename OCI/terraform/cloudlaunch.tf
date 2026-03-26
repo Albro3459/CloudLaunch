@@ -109,6 +109,16 @@ variable "wg_network_v6" {
 	description = "WireGuard IPv6 network CIDR for NAT"
 }
 
+variable "wg_dns_address_v4" {
+	type = string
+	description = "WireGuard DNS server IPv4 address"
+}
+
+variable "wg_dns_address_v6" {
+	type = string
+	description = "WireGuard DNS server IPv6 address"
+}
+
 variable "wg_rate_limit" {
 	type = string
 	description = "Rate limit for new inbound UDP packets on WireGuard port"
@@ -155,6 +165,8 @@ locals {
 		listen_port = var.wg_listen_port
 		wg_address_v4 = var.wg_address_v4
 		wg_address_v6 = var.wg_address_v6
+		wg_dns_address_v4 = var.wg_dns_address_v4
+		wg_dns_address_v6 = var.wg_dns_address_v6
 		wg_network_v4 = var.wg_network_v4
 		wg_network_v6 = var.wg_network_v6
 		server_private_key = var.wireguard_server_private_key
