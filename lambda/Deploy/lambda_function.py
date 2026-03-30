@@ -1,18 +1,23 @@
 import json
 import boto3
-from collections import defaultdict
 
-from vpn_manager import batch_update_aws_instances, check_image_exists, deploy_instance, terminate_all_other_instances
+from vpn_manager import deploy_instance, terminate_stack
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
-from firebase import batch_update_instance_statuses, get_user_instances_in_region, get_live_regions, get_users_instances, initialize_firebase, verify_firebase_token, get_user_role
+from firebase import get_instance, update_instance_status, get_user_instances_in_region, get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 from notify import deliver_emails
+from config_helper import get_wireguard_config_options
 
-CLEANUP_VPNS = False
-SOURCE_REGION = "us-west-1"
-SENDER="CloudLaunch <noreply@cloudlaunch.live>"
-ADMIN="brodsky.alex22@gmail.com"
+AWS_REGION = "us-west-1"
+
+FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
+DEPLOY_SECRET_NAME = "VPN-Config"
+OCI_AUTH_SECRET_NAME = "OCI-Auth"
+
 VALID_ACTIONS = {"deploy", "terminate"}
+
+OCI_REGION = "us-sanjose-1"
+OCI_REGION_NAME = "San Jose"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -66,28 +71,47 @@ def lambda_handler(event, context):
         }        
         
     # Fetch secrets
-    if not target_region and action.lower() == "terminate":
-        secrets = get_secret(f"wireguard/config/{SOURCE_REGION}", SOURCE_REGION)
-    else:
-        secrets = get_secret(f"wireguard/config/{target_region}", target_region)
-    if not secrets:
+    vpn_config_secret = get_secret(DEPLOY_SECRET_NAME, AWS_REGION)
+    if not vpn_config_secret:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
-    firebaseSecrets = get_secret("FirebaseServiceAccount", "us-west-1")
+    oci_auth_secret = get_secret(OCI_AUTH_SECRET_NAME, AWS_REGION)
+    if not oci_auth_secret:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": f"Failed to retrieve required secret: {OCI_AUTH_SECRET_NAME}"})
+        }
+    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
     if not firebaseSecrets:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
         }
 
-    vpn_image_id = secrets.get("VPN_IMAGE_ID")
-    key_name = secrets.get("KEY_NAME")
-    security_group_id = secrets.get("SECURITY_GROUP_ID")
-    subnet_id = secrets.get("SUBNET_ID")
-    client_private_key = secrets.get("CLIENT_PRIVATE_KEY")
-    server_public_key = secrets.get("SERVER_PUBLIC_KEY")
+    if vpn_config_secret.get("OCI_REGION") and vpn_config_secret.get("OCI_REGION") != OCI_REGION:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "OCI secret region does not match configured OCI region"})
+        }
+
+    client_private_key = vpn_config_secret.get("WG_CLIENT_PRIVATE_KEY")
+    server_public_key = vpn_config_secret.get("WG_SERVER_PUBLIC_KEY")
+    sender = vpn_config_secret.get("SES_SENDER")
+    admin_email = vpn_config_secret.get("ADMIN_EMAIL")
+    if not client_private_key or not server_public_key or not sender or not admin_email:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Missing required secret values"})
+        }
+    try:
+        wireguard_options = get_wireguard_config_options(vpn_config_secret)
+    except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
+        }
     
     # Verify token
     initialize_firebase(firebaseSecrets)
@@ -107,33 +131,45 @@ def lambda_handler(event, context):
             print(f"Invalid or missing targets: {targets}")
             return {"statusCode": 400, "body": json.dumps({"error": "Invalid or missing targets"})}
 
-        
-        # targets = {
-        #     "userID": {
-        #         "us-west-1": ["i-0123"],
-        #         "us-east-1": ["i-0456"]
-        #     }
-        # }
-        
         print(f"User {user_id}: terminating {targets}")
-        
-        # defaultdict(...) to avoid missing key errors
-        region_instance_map = defaultdict(list)
+
+        terminated_targets = []
+        errors = []
         for uid, regions in targets.items():
             for region, instance_ids in regions.items():
-                region_instance_map[region].extend(instance_ids)
+                for instance_id in instance_ids:
+                    instance = get_instance(uid, region, instance_id)
+                    if not instance:
+                        errors.append(f"Instance {instance_id} not found for user {uid} in region {region}")
+                        continue
 
-        # dict(defaultdict) converts to regular dict
-        batch_update_aws_instances(action.lower(), dict(region_instance_map))
-        
-        # Call Firestore update per user
-        for uid, region_map in targets.items():
-            batch_update_instance_statuses(uid, region_map, "Terminated")
-            
+                    stack_ocid = instance.get("stackOcid")
+                    if not stack_ocid:
+                        errors.append(f"Instance {instance_id} is missing stackOcid")
+                        continue
+
+                    try:
+                        terminate_stack(oci_auth_secret, stack_ocid, OCI_REGION)
+                        update_instance_status(uid, region, instance_id, "Terminated")
+                        terminated_targets.append({"uid": uid, "region": region, "instance_id": instance_id})
+                    except Exception as e:
+                        errors.append(f"Failed to terminate {instance_id}: {e}")
+
+        if errors:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({
+                    "error": "One or more terminations failed",
+                    "details": errors,
+                    "terminated": terminated_targets,
+                })
+            }
+
         return {
             "statusCode": 200,
             "body": json.dumps({
-                "action_completed": action.lower()
+                "action_completed": action.lower(),
+                "terminated": terminated_targets,
             })
         }
         
@@ -158,23 +194,6 @@ def lambda_handler(event, context):
         if user_vpn_count >= vpn_role_max_count:
             return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
         increment_user_count(user_id, user_table)
-            
-        if not vpn_image_id or not security_group_id or not key_name:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": "Missing required secret values"})
-            }
-        
-        
-        ec2 = boto3.client("ec2", region_name=target_region)
-
-        # Check if Image exists
-        image_id = check_image_exists(ec2, vpn_image_id)
-        if "Image does not exist in region" in image_id or "Error checking Image" in image_id:
-            return {
-                "statusCode": 500,
-                "body": json.dumps({"error": image_id})
-            }
                     
         # Make sure there are no running instances in the region for that user
         # if there are, just return that instance ID
@@ -191,15 +210,9 @@ def lambda_handler(event, context):
                     "server_public_key": server_public_key
                 })
             }
-                
-        # Clean Up other instances:
-        if CLEANUP_VPNS:
-            # Terminate all instances for all users
-            # Also update statuses for all users instances in Firestore
-            terminate_all_other_instances(live_regions)
 
-        # Deploy the EC2 instance
-        result = deploy_instance(user_id, ec2, image_id, security_group_id, subnet_id, key_name)
+        # Deploy the OCI instance through Resource Manager
+        result = deploy_instance(vpn_config_secret, oci_auth_secret, user_id, target_region)
         if result["error"]:
             return {
                 "statusCode": 500,
@@ -215,12 +228,21 @@ def lambda_handler(event, context):
             }
             
         # Send emails
-        ses_client = boto3.client('sesv2', region_name=SOURCE_REGION)
+        ses_client = boto3.client('sesv2', region_name=AWS_REGION)
         emails = [email]
-        if email != ADMIN:
-            emails.append(ADMIN)
+        if email != admin_email:
+            emails.append(admin_email)
         
-        deliver_emails(ses_client, client_private_key, server_public_key, public_ip, target_region, SENDER, emails)
+        deliver_emails(
+            ses_client,
+            client_private_key,
+            server_public_key,
+            public_ip,
+            OCI_REGION_NAME,
+            sender,
+            emails,
+            wireguard_options,
+        )
 
         return {
             "statusCode": 200,

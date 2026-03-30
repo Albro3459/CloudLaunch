@@ -1,10 +1,11 @@
 import json
-from firebase_admin import auth, firestore
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 
-SOURCE_REGION = "us-west-1"
+AWS_REGION = "us-west-1"
+FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
+DEPLOY_SECRET_NAME = "VPN-Config"
 
 def lambda_handler(event, context):
     """
@@ -34,13 +35,13 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    secrets = get_secret(f"wireguard/config/{SOURCE_REGION}", SOURCE_REGION)
+    secrets = get_secret(DEPLOY_SECRET_NAME, AWS_REGION)
     if not secrets:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
-    firebaseSecrets = get_secret("FirebaseServiceAccount", SOURCE_REGION)
+    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
     if not firebaseSecrets:
         return {
             "statusCode": 500,
@@ -61,9 +62,9 @@ def lambda_handler(event, context):
     result = {}
     for key in requested_keys:
         if key == "client_private_key":
-            result[key] = secrets.get("CLIENT_PRIVATE_KEY")
+            result[key] = secrets.get("WG_CLIENT_PRIVATE_KEY")
         elif key == "server_public_key":
-            result[key] = secrets.get("SERVER_PUBLIC_KEY")
+            result[key] = secrets.get("WG_SERVER_PUBLIC_KEY")
         else:
             result[key] = None # Explicitly show unknown keys
 

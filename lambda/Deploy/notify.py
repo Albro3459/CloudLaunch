@@ -65,14 +65,14 @@ def send_VPN_email(ses_client, region, sender, recipient, ip_address, config, qr
         return None
 
     
-def deliver_emails(ses_client, client_private_key, server_public_key, ip_address, region, SENDER, emails):
-    config = get_config(client_private_key, server_public_key, ip_address)
+def deliver_emails(ses_client, client_private_key, server_public_key, ip_address, region, SENDER, emails, wireguard_options):
+    config = get_config(client_private_key, server_public_key, ip_address, wireguard_options)
     if not config:
         print(f"Failed to get Config for {ip_address}")
         return None
         
     qr_code = build_QR_code(config)
-    if not config:
+    if not qr_code:
         print(f"Failed to build QR Code for {qr_code}")
         return None
     

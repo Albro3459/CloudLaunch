@@ -4,7 +4,8 @@ from firebase_admin import auth, firestore
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import get_secret
 
-SOURCE_REGION = "us-west-1"
+AWS_REGION = "us-west-1"
+FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
 
 def create_auth_user(email, password):
     try:
@@ -58,7 +59,7 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    firebaseSecrets = get_secret("FirebaseServiceAccount", SOURCE_REGION)
+    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
     if not firebaseSecrets:
         return {
             "statusCode": 500,

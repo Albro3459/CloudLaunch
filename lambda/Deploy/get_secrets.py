@@ -22,3 +22,9 @@ def get_secret(secret_name, region_name):
         print(f"Error retrieving secret '{secret_name}': {e}")
 
     return None
+
+def get_secret_value(secret_values, key):
+    value = (secret_values or {}).get(key)
+    if value not in (None, ""):
+        return value
+    raise ValueError(f"Missing required secret value for key: {key}")

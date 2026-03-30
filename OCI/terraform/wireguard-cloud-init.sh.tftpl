@@ -26,7 +26,7 @@ WG_DNS_ADDRESS_V4="${wg_dns_address_v4}"
 WG_DNS_ADDRESS_V6="${wg_dns_address_v6}"
 WG_NETWORK_V4="${wg_network_v4}"
 WG_NETWORK_V6="${wg_network_v6}"
-SERVER_PRIVATE_KEY="${server_private_key}"
+WG_SERVER_PRIVATE_KEY="${wg_server_private_key}"
 RATE_LIMIT="${rate_limit}"
 RATE_LIMIT_BURST="${rate_limit_burst}"
 PRIMARY_IFACE="$(ip route show default | awk '/default/ { print $5; exit }')"
@@ -103,7 +103,7 @@ cat > "/etc/wireguard/$WG_INTERFACE.conf" <<WGCONF
 [Interface]
 Address = $WG_ADDRESS_V4, $WG_ADDRESS_V6
 ListenPort = $LISTEN_PORT
-PrivateKey = $SERVER_PRIVATE_KEY
+PrivateKey = $WG_SERVER_PRIVATE_KEY
 
 # PostUp
 # IPv4
@@ -153,7 +153,7 @@ WGCONF
 
 chmod 600 "/etc/wireguard/$WG_INTERFACE.conf"
 
-printf '%s\n' "$(printf '%s' "$SERVER_PRIVATE_KEY" | wg pubkey)" > "/etc/wireguard/$WG_INTERFACE.publickey"
+printf '%s\n' "$(printf '%s' "$WG_SERVER_PRIVATE_KEY" | wg pubkey)" > "/etc/wireguard/$WG_INTERFACE.publickey"
 chmod 600 "/etc/wireguard/$WG_INTERFACE.publickey"
 
 echo "==> Step 7/8: Writing unbound configuration"

@@ -129,13 +129,13 @@ variable "wg_rate_limit_burst" {
 	description = "Rate limit burst for inbound WireGuard UDP packets"
 }
 
-variable "wireguard_server_private_key" {
+variable "wg_server_private_key" {
 	type = string
 	sensitive = true
 	description = "WireGuard server private key used in /etc/wireguard/wg0.conf"
 }
 
-variable "wireguard_client_public_key" {
+variable "wg_client_public_key" {
 	type = string
 	description = "Client peer public key allowed to connect to wg0"
 }
@@ -169,11 +169,11 @@ locals {
 		wg_dns_address_v6 = var.wg_dns_address_v6
 		wg_network_v4 = var.wg_network_v4
 		wg_network_v6 = var.wg_network_v6
-		server_private_key = var.wireguard_server_private_key
+		server_private_key = var.wg_server_private_key
 		rate_limit = var.wg_rate_limit
 		rate_limit_burst = var.wg_rate_limit_burst
 		peer = {
-			public_key = var.wireguard_client_public_key
+			public_key = var.wg_client_public_key
 			allowed_ipv4 = var.wg_peer_allowed_ipv4
 			allowed_ipv6 = var.wg_peer_allowed_ipv6
 			persistent_keepalive = var.wg_peer_persistent_keepalive

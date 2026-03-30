@@ -98,7 +98,7 @@ def get_users_instances(user_id, target_regions=None):
 def get_user_instances_in_region(user_id, role, region):
     # Returns 1+ VPNs (region_instance_map) in the requested region or None
 
-    # Commenting this out because the Admin doesn't want to get back another user's VPN, they only want their own.
+    # Commenting this out because the Admin doesn't want to get back another user's VPN when trying to create a new one, they only want their own.
     # The Admin can see the other user's VPNs in the table
     # if role == "admin":
     #     usersIDs = get_all_user_ids()
@@ -116,7 +116,30 @@ def get_user_instances_in_region(user_id, role, region):
         return region_instances if region_instances else None
 
 
-def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
+def get_instance(uid, region, instance_id):
+    try:
+        db = firestore.client()
+        instance_ref = (
+            db.collection("Users")
+              .document(uid)
+              .collection("Regions")
+              .document(region)
+              .collection("Instances")
+              .document(instance_id)
+        )
+        doc = instance_ref.get()
+        if not doc.exists:
+            return None
+
+        data = doc.to_dict() or {}
+        data["id"] = doc.id
+        return data
+    except Exception as e:
+        print(f"Error fetching instance {instance_id}: {e}")
+        return None
+
+
+def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName, stack_ocid):
     try:
         db = firestore.client()
         region_ref = (
@@ -134,6 +157,7 @@ def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName):
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "ipv4": ipv4,
             "name": instanceName,
+            "stackOcid": stack_ocid,
             "status": "Running"
         }
         

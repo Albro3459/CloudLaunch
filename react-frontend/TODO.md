@@ -2,6 +2,8 @@
 
 * need to update to work with the lambda changes once theyre done
 
+* wg config needs to pull way more from secrets, not just the keys
+
 * only 1 region needs to be available now, still keep the drop down tho probably just have the first entry preselected which will be CA
 
 * terraform and cleanup is no longer needed
