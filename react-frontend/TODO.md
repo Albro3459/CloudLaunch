@@ -13,3 +13,9 @@
 * update about page to not bold the conf and maybe change wording to OCI but prolly now
 
 * table should always be there but just have no data when the user has no vpns and show loading instead of hiding the table. show a placeholder or something.
+
+* Handle new statuses for vpns in firebase:
+  - `Pending`
+  - `Running`
+  - `Failed`
+  - `Terminated`

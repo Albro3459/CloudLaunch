@@ -8,12 +8,18 @@ from pathlib import Path
 
 import oci
 
-from firebase import add_instance_to_firebase
+from firebase import (
+    attach_instance_ocid,
+    mark_instance_failed,
+    mark_instance_running,
+    upsert_stack_backed_instance_record,
+)
 from get_secrets import get_secret_value
 
 STACK_CREATE_TIMEOUT_SECONDS = 300
 JOB_TIMEOUT_SECONDS = 1800
 PUBLIC_IP_TIMEOUT_SECONDS = 300
+INSTANCE_TERMINATION_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 5
 STACK_TERRAFORM_FILES = (
     "cloudlaunch.tf",
@@ -42,17 +48,10 @@ def _get_clients(auth_secret_values, region):
     }
 
 def _get_terraform_directory():
-    current_file = Path(__file__).resolve()
-    candidates = [
-        current_file.parents[2] / "OCI" / "terraform",
-        current_file.parent / "terraform",
-    ]
-
-    for candidate in candidates:
-        if candidate.is_dir():
-            return candidate
-
-    raise FileNotFoundError("Unable to locate OCI terraform package directory")
+    terraform_dir = Path(__file__).resolve().parent / "terraform"
+    if terraform_dir.is_dir():
+        return terraform_dir
+    raise FileNotFoundError(f"Deploy terraform directory is missing: {terraform_dir}")
 
 def _zip_terraform_package():
     terraform_dir = _get_terraform_directory()
@@ -212,7 +211,180 @@ def _get_instance_public_ip(compute_client, virtual_network_client, compartment_
     raise TimeoutError(f"Timed out waiting for public IP on instance {instance_id}")
 
 
+def _is_missing_resource_error(exception):
+    status = getattr(exception, "status", None)
+    code = str(getattr(exception, "code", "") or "").upper()
+    message = str(exception).lower()
+
+    if status == 404:
+        return True
+    if code in {
+        "NOTAUTHORIZEDORNOTFOUND",
+        "NOTFOUND",
+        "RELATEDRESOURCE_NOT_AUTHORIZED_OR_NOT_FOUND",
+        "RESOURCE_NOT_FOUND",
+    }:
+        return True
+    return (
+        "not found" in message
+        or "does not exist" in message
+        or "notauthorizedornotfound" in message
+    )
+
+
+def _get_instance_cleanup_status(compute_client, instance_id):
+    try:
+        instance = compute_client.get_instance(instance_id).data
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": instance_id,
+                "status": "absent",
+                "detail": "Instance already absent",
+            }
+        raise
+
+    lifecycle_state = getattr(instance, "lifecycle_state", None)
+    if lifecycle_state == "TERMINATED":
+        return {
+            "id": instance_id,
+            "status": "terminated",
+            "detail": "Instance terminated",
+        }
+    return {
+        "id": instance_id,
+        "status": "active",
+        "detail": f"Instance state is {lifecycle_state}",
+    }
+
+
+def _wait_for_instance_absence_or_termination(compute_client, instance_id, timeout_seconds):
+    deadline = time.time() + timeout_seconds
+
+    while time.time() < deadline:
+        status = _get_instance_cleanup_status(compute_client, instance_id)
+        if status["status"] in {"absent", "terminated"}:
+            return status
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+    return {
+        "id": instance_id,
+        "status": "timeout",
+        "detail": f"Timed out waiting for instance {instance_id} to terminate",
+    }
+
+
+def _terminate_instance_directly(compute_client, instance_id):
+    try:
+        status = _get_instance_cleanup_status(compute_client, instance_id)
+        if status["status"] in {"absent", "terminated"}:
+            return status
+
+        compute_client.terminate_instance(instance_id)
+        return _wait_for_instance_absence_or_termination(
+            compute_client,
+            instance_id,
+            INSTANCE_TERMINATION_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": instance_id,
+                "status": "absent",
+                "detail": "Instance already absent",
+            }
+        return {
+            "id": instance_id,
+            "status": "failed",
+            "detail": str(exc),
+        }
+
+
+def _destroy_stack(resource_manager_client, stack_id):
+    try:
+        stack = resource_manager_client.get_stack(stack_id).data
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": stack_id,
+                "status": "absent",
+                "detail": "Stack already absent",
+            }
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "detail": str(exc),
+        }
+    if getattr(stack, "lifecycle_state", None) == "DELETED":
+        return {
+            "id": stack_id,
+            "status": "absent",
+            "detail": "Stack already absent",
+        }
+
+    try:
+        destroy_job = _create_job(
+            resource_manager_client,
+            stack_id,
+            oci.resource_manager.models.CreateDestroyJobOperationDetails(
+                execution_plan_strategy="AUTO_APPROVED"
+            ),
+            f"Destroy {stack_id}",
+        )
+        job = _wait_for_job(resource_manager_client, destroy_job.id, JOB_TIMEOUT_SECONDS)
+        if getattr(job, "lifecycle_state", None) == "SUCCEEDED":
+            return {
+                "id": stack_id,
+                "status": "destroyed",
+                "detail": f"Destroy job {destroy_job.id} succeeded",
+            }
+
+        try:
+            stack = resource_manager_client.get_stack(stack_id).data
+        except Exception as exc:
+            if _is_missing_resource_error(exc):
+                return {
+                    "id": stack_id,
+                    "status": "absent",
+                    "detail": "Stack became absent during destroy",
+                }
+        if getattr(stack, "lifecycle_state", None) == "DELETED":
+            return {
+                "id": stack_id,
+                "status": "absent",
+                "detail": "Stack became absent during destroy",
+            }
+
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "detail": f"Destroy job {destroy_job.id} ended in state {job.lifecycle_state}",
+        }
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": stack_id,
+                "status": "absent",
+                "detail": "Stack already absent",
+            }
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "detail": str(exc),
+        }
+
+
+def _safe_mark_instance_failed(user_id, target_region, stack_id, error_message):
+    try:
+        mark_instance_failed(user_id, target_region, stack_id, error_message)
+    except Exception as exc:
+        print(f"Failed to persist Deploy record failure for stack {stack_id}: {exc}")
+
+
 def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
+    stack = None
+    instance_id = None
+
     try:
         clients = _get_clients(auth_secret_values, target_region)
         resource_manager_client = clients["resource_manager"]
@@ -220,6 +392,8 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
         virtual_network_client = clients["virtual_network"]
 
         stack = _create_stack(resource_manager_client, secret_values, user_id)
+        upsert_stack_backed_instance_record(user_id, target_region, stack.id, stack.display_name)
+
         apply_job = _create_job(
             resource_manager_client,
             stack.id,
@@ -230,25 +404,15 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
         )
         apply_result = _wait_for_job(resource_manager_client, apply_job.id, JOB_TIMEOUT_SECONDS)
         if getattr(apply_result, "lifecycle_state", None) != "SUCCEEDED":
-            return {
-                "error": f"OCI apply job failed with state {apply_result.lifecycle_state}",
-                "instance_id": None,
-                "instance_name": None,
-                "public_ip": None,
-                "stack_id": stack.id,
-            }
+            raise RuntimeError(f"OCI apply job failed with state {apply_result.lifecycle_state}")
 
         time.sleep(2)
         tf_state = json.loads(resource_manager_client.get_job_tf_state(apply_job.id).data)
         instance_id = _get_instance_ocid_from_state(tf_state)
         if not instance_id:
-            return {
-                "error": "OCI apply completed but instance OCID could not be resolved from Terraform state",
-                "instance_id": None,
-                "instance_name": stack.display_name,
-                "public_ip": None,
-                "stack_id": stack.id,
-            }
+            raise RuntimeError("OCI apply completed but instance OCID could not be resolved from Terraform state")
+
+        attach_instance_ocid(user_id, target_region, stack.id, instance_id)
 
         public_ip = _get_instance_public_ip(
             compute_client,
@@ -257,7 +421,7 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
             instance_id,
         )
 
-        add_instance_to_firebase(user_id, target_region, instance_id, public_ip, stack.display_name, stack.id)
+        mark_instance_running(user_id, target_region, stack.id, public_ip)
         return {
             "error": None,
             "instance_id": instance_id,
@@ -268,28 +432,56 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
     except Exception as e:
         error = f"OCI deployment failed: {e}"
         print(error)
+        if stack is not None:
+            _safe_mark_instance_failed(user_id, target_region, stack.id, error)
         return {
             "error": error,
-            "instance_id": None,
-            "instance_name": None,
+            "instance_id": instance_id,
+            "instance_name": getattr(stack, "display_name", None),
             "public_ip": None,
-            "stack_id": None,
+            "stack_id": getattr(stack, "id", None),
         }
 
-def terminate_stack(auth_secret_values, stack_id, target_region):
+def terminate_instance_resources(auth_secret_values, target_region, stack_id=None, instance_ocid=None):
     clients = _get_clients(auth_secret_values, target_region)
     resource_manager_client = clients["resource_manager"]
+    compute_client = clients["compute"]
 
-    destroy_job = _create_job(
-        resource_manager_client,
-        stack_id,
-        oci.resource_manager.models.CreateDestroyJobOperationDetails(
-            execution_plan_strategy="AUTO_APPROVED"
-        ),
-        f"Destroy {stack_id}",
+    if stack_id:
+        stack_result = _destroy_stack(resource_manager_client, stack_id)
+    else:
+        stack_result = {
+            "id": None,
+            "status": "skipped",
+            "detail": "No stack ID available",
+        }
+
+    stack_cleanup_completed = stack_result["status"] in {"destroyed", "absent"}
+
+    if instance_ocid:
+        if stack_cleanup_completed:
+            instance_result = _wait_for_instance_absence_or_termination(
+                compute_client,
+                instance_ocid,
+                INSTANCE_TERMINATION_TIMEOUT_SECONDS,
+            )
+            if instance_result["status"] not in {"absent", "terminated"}:
+                instance_result = _terminate_instance_directly(compute_client, instance_ocid)
+        else:
+            instance_result = _terminate_instance_directly(compute_client, instance_ocid)
+    else:
+        instance_result = {
+            "id": None,
+            "status": "skipped",
+            "detail": "No instance OCID available",
+        }
+
+    cleanup_completed = stack_cleanup_completed and (
+        not instance_ocid or instance_result["status"] in {"absent", "terminated"}
     )
-    job = _wait_for_job(resource_manager_client, destroy_job.id, JOB_TIMEOUT_SECONDS)
-    if getattr(job, "lifecycle_state", None) != "SUCCEEDED":
-        raise RuntimeError(f"OCI destroy job failed with state {job.lifecycle_state}")
 
-    return destroy_job.id
+    return {
+        "ok": cleanup_completed,
+        "stack": stack_result,
+        "instance": instance_result,
+    }

@@ -3,6 +3,30 @@ from firebase_admin import credentials, auth, firestore
 
 from datetime import datetime, timezone
 
+
+def _utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _get_region_ref(uid, region):
+    db = firestore.client()
+    return (
+        db.collection("Users")
+          .document(uid)
+          .collection("Regions")
+          .document(region)
+    )
+
+
+def _ensure_region_exists(region_ref):
+    # Firestore subcollections behave more predictably when the parent doc exists.
+    region_ref.set({"created": firestore.SERVER_TIMESTAMP}, merge=True)
+
+
+def _get_instance_ref(uid, region, instance_id):
+    region_ref = _get_region_ref(uid, region)
+    return region_ref, region_ref.collection("Instances").document(instance_id)
+
 # Initialize Firebase Admin SDK
 def initialize_firebase(firebaseSecrets):
     if not firebase_admin._apps:  # Ensures Firebase is initialized only once
@@ -72,7 +96,7 @@ def get_users_instances(user_id, target_regions=None):
                 continue
             region_id = region_doc.id
             instances_ref = regions_ref.document(region_id).collection("Instances")
-            query = instances_ref.where("status", "in", ["Running", "Stopped"]) # Live statuses # todo check Stopped because I think only Running and Terminated should be possible
+            query = instances_ref.where("status", "in", ["Pending", "Running"]) # Live statuses
             docs = query.stream()
 
             instances = []
@@ -118,15 +142,7 @@ def get_user_instances_in_region(user_id, role, region):
 
 def get_instance(uid, region, instance_id):
     try:
-        db = firestore.client()
-        instance_ref = (
-            db.collection("Users")
-              .document(uid)
-              .collection("Regions")
-              .document(region)
-              .collection("Instances")
-              .document(instance_id)
-        )
+        _, instance_ref = _get_instance_ref(uid, region, instance_id)
         doc = instance_ref.get()
         if not doc.exists:
             return None
@@ -139,45 +155,81 @@ def get_instance(uid, region, instance_id):
         return None
 
 
-def add_instance_to_firebase(uid, region, instance_id, ipv4, instanceName, stack_ocid):
-    try:
-        db = firestore.client()
-        region_ref = (
-            db.collection("Users")
-                .document(uid)
-            .collection("Regions")
-                .document(region)
-        ) 
-        # Ensure region doc exists with at least one field (otherwise firebase does weird stuff like saying a subcollection doesn't exist when it does)
-        region_ref.set({"created": firestore.SERVER_TIMESTAMP}, merge=True)
-        
-        instance_ref = region_ref.collection("Instances").document(instance_id)
-        
-        instance_data = {
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "ipv4": ipv4,
-            "name": instanceName,
-            "stackOcid": stack_ocid,
-            "status": "Running"
-        }
-        
-        instance_ref.set(instance_data)
-        print(f"Instance {instance_id} saved for user {uid} in region {region}.")
-    except Exception as e:
-        print(f"Error saving instance: {e}")
-        
+def upsert_stack_backed_instance_record(uid, region, stack_id, instance_name):
+    region_ref, instance_ref = _get_instance_ref(uid, region, stack_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "createdAt": _utc_now_iso(),
+        "instanceOcid": None,
+        "ipv4": None,
+        "lastError": None,
+        "name": instance_name,
+        "status": "Pending",
+    }, merge=True)
+    print(f"Stack-backed instance record {stack_id} saved for user {uid} in region {region}.")
+
+
+def attach_instance_ocid(uid, region, stack_id, instance_ocid):
+    region_ref, instance_ref = _get_instance_ref(uid, region, stack_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "instanceOcid": instance_ocid,
+        "lastError": None,
+    }, merge=True)
+    print(f"Instance OCID attached to record {stack_id} for user {uid} in region {region}.")
+
+
+def mark_instance_running(uid, region, stack_id, ipv4):
+    region_ref, instance_ref = _get_instance_ref(uid, region, stack_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "ipv4": ipv4,
+        "lastError": None,
+        "status": "Running",
+    }, merge=True)
+    print(f"Instance record {stack_id} marked Running for user {uid} in region {region}.")
+
+
+def mark_instance_failed(uid, region, stack_id, error_message):
+    region_ref, instance_ref = _get_instance_ref(uid, region, stack_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "lastError": error_message,
+        "status": "Failed",
+    }, merge=True)
+    print(f"Instance record {stack_id} marked Failed for user {uid} in region {region}.")
+
+
+def mark_instance_terminated(uid, region, instance_id):
+    region_ref, instance_ref = _get_instance_ref(uid, region, instance_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "lastError": None,
+        "status": "Terminated",
+        "terminatedAt": _utc_now_iso(),
+    }, merge=True)
+    print(f"Instance {instance_id} in region {region} marked Terminated for user {uid}.")
+
+
+def record_instance_cleanup_error(uid, region, instance_id, error_message):
+    region_ref, instance_ref = _get_instance_ref(uid, region, instance_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "lastError": error_message,
+    }, merge=True)
+    print(f"Cleanup error recorded for instance {instance_id} in region {region} for user {uid}.")
+
+
 def update_instance_status(uid, region, instance_id, status):
     try:
-        db = firestore.client()
-        instance_ref = (
-            db.collection("Users")
-                .document(uid)
-              .collection("Regions")
-                .document(region)
-              .collection("Instances")
-              . document(instance_id)
-        )   
-             
+        _, instance_ref = _get_instance_ref(uid, region, instance_id)
+
         instance_ref.update({"status": status})
         print(f"Instance {instance_id} in region {region} updated for user {uid}.")
     except Exception as e:

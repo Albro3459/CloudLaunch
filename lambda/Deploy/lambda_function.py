@@ -1,9 +1,18 @@
 import json
 import boto3
 
-from vpn_manager import deploy_instance, terminate_stack
+from vpn_manager import deploy_instance, terminate_instance_resources
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
-from firebase import get_instance, update_instance_status, get_user_instances_in_region, get_live_regions, initialize_firebase, verify_firebase_token, get_user_role
+from firebase import (
+    get_instance,
+    get_user_instances_in_region,
+    get_live_regions,
+    initialize_firebase,
+    mark_instance_terminated,
+    record_instance_cleanup_error,
+    verify_firebase_token,
+    get_user_role,
+)
 from get_secrets import get_secret
 from notify import deliver_emails
 from config_helper import get_wireguard_config_options
@@ -22,6 +31,23 @@ OCI_REGION_NAME = "San Jose"
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
 role_table = dynamodb.Table("vpn-roles")
+
+
+def _build_cleanup_error(instance_id, cleanup_result):
+    stack_result = cleanup_result.get("stack", {})
+    instance_result = cleanup_result.get("instance", {})
+    return (
+        f"Cleanup failed for {instance_id}. "
+        f"Stack cleanup: {stack_result.get('status')} ({stack_result.get('detail')}). "
+        f"Instance cleanup: {instance_result.get('status')} ({instance_result.get('detail')})."
+    )
+
+
+def _record_cleanup_error_safely(uid, region, instance_id, error_message):
+    try:
+        record_instance_cleanup_error(uid, region, instance_id, error_message)
+    except Exception as e:
+        print(f"Failed to persist cleanup error for {instance_id}: {e}")
 
 def lambda_handler(event, context):
     """
@@ -140,20 +166,61 @@ def lambda_handler(event, context):
                 for instance_id in instance_ids:
                     instance = get_instance(uid, region, instance_id)
                     if not instance:
-                        errors.append(f"Instance {instance_id} not found for user {uid} in region {region}")
+                        errors.append({
+                            "uid": uid,
+                            "region": region,
+                            "instance_id": instance_id,
+                            "error": "Instance record not found",
+                        })
                         continue
 
-                    stack_ocid = instance.get("stackOcid")
-                    if not stack_ocid:
-                        errors.append(f"Instance {instance_id} is missing stackOcid")
-                        continue
+                    stack_id = instance.get("stackOcid") or instance_id
+                    instance_ocid = instance.get("instanceOcid")
 
                     try:
-                        terminate_stack(oci_auth_secret, stack_ocid, OCI_REGION)
-                        update_instance_status(uid, region, instance_id, "Terminated")
-                        terminated_targets.append({"uid": uid, "region": region, "instance_id": instance_id})
+                        cleanup_result = terminate_instance_resources(
+                            oci_auth_secret,
+                            OCI_REGION,
+                            stack_id=stack_id,
+                            instance_ocid=instance_ocid,
+                        )
+                        if cleanup_result["ok"]:
+                            mark_instance_terminated(uid, region, instance_id)
+                            terminated_targets.append({
+                                "uid": uid,
+                                "region": region,
+                                "instance_id": instance_id,
+                                "stack_id": stack_id,
+                                "instance_ocid": instance_ocid,
+                            })
+                            continue
+
+                        _record_cleanup_error_safely(
+                            uid,
+                            region,
+                            instance_id,
+                            _build_cleanup_error(instance_id, cleanup_result),
+                        )
+                        errors.append({
+                            "uid": uid,
+                            "region": region,
+                            "instance_id": instance_id,
+                            "stack_id": stack_id,
+                            "instance_ocid": instance_ocid,
+                            "stack": cleanup_result.get("stack"),
+                            "instance": cleanup_result.get("instance"),
+                        })
                     except Exception as e:
-                        errors.append(f"Failed to terminate {instance_id}: {e}")
+                        error_message = f"Failed to terminate {instance_id}: {e}"
+                        _record_cleanup_error_safely(uid, region, instance_id, error_message)
+                        errors.append({
+                            "uid": uid,
+                            "region": region,
+                            "instance_id": instance_id,
+                            "stack_id": stack_id,
+                            "instance_ocid": instance_ocid,
+                            "error": str(e),
+                        })
 
         if errors:
             return {

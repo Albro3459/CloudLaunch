@@ -51,3 +51,17 @@ To choose a different zip name:
 The script builds the Docker image, copies `/layer/python` out of the container, zips it, and writes the final zip to your Desktop.
 
 Upload the resulting layer zip to AWS Lambda, publish a new layer version, and attach it to the Lambda functions.
+
+## Deploy Lambda Packaging Notes
+
+Use [build_deploy_lambda.sh](Deploy/build_deploy_lambda.sh) as the supported workflow for packaging the `Deploy` Lambda.
+
+From the `lambda/Deploy/` directory, run:
+
+```sh
+zsh ./build_deploy_lambda.sh
+```
+
+The script recreates `~/Desktop/Deploy`, copies the `Deploy` Lambda code into that folder, and adds `terraform/` with the required OCI files.
+
+Zip `~/Desktop/Deploy` and upload that zip as the `Deploy` Lambda code package.
