@@ -6,4 +6,4 @@ WORKDIR /layer
 
 # Install required packages into /layer/python
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir firebase-admin google-cloud-firestore requests qrcode[pil] -t python/
+    pip install --no-cache-dir firebase-admin google-cloud-firestore requests qrcode[pil] oci -t python/

@@ -1,5 +1,6 @@
 **/Secrets/*
 !**/Secrets/example.*
+!**/Secrets/*.example
 
 **/output.css
 
@@ -15,3 +16,5 @@ node_modules
 **/.terraform*
 **/.terraform/*
 **/vm_dump.md
+
+**/__pycache__/

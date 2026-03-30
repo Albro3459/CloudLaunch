@@ -5,6 +5,8 @@
    <img src="https://github.com/user-attachments/assets/2665ae69-5ab6-4d1d-ab18-f1cd32935ae8" alt="Deploy" height="400"/>
 </div>
 
+# TODO update the readme for oracle
+
 ## About:
 
  * Live at: [cloudlaunch.live/](https://www.cloudlaunch.live/)
