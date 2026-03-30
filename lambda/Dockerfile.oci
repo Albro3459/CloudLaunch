@@ -1,4 +1,5 @@
-# Base Cloudlaunch layer with Firebase and QR Code libraries
+# Used for Deploy script only for Cloudlaunch
+# OCI was too big for one layer so had to make it its own
 
 # Use AWS Lambda Python base image for x86_64
 FROM public.ecr.aws/lambda/python:3.11
@@ -8,4 +9,4 @@ WORKDIR /layer
 
 # Install required packages into /layer/python
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir firebase-admin google-cloud-firestore requests qrcode[pil] oci -t python/
+    pip install --no-cache-dir oci -t python/
