@@ -10,6 +10,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import quote
 
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 import requests
 
 from firebase import (
@@ -38,82 +40,15 @@ class OciServiceError(Exception):
         self.code = code
 
 
-class _DerReader:
-    def __init__(self, data):
-        self.data = data
-        self.offset = 0
-
-    def read_tlv(self, expected_tag=None):
-        if self.offset >= len(self.data):
-            raise ValueError("Unexpected end of DER data")
-
-        tag = self.data[self.offset]
-        self.offset += 1
-        if expected_tag is not None and tag != expected_tag:
-            raise ValueError(f"Unexpected DER tag {tag:#x}; expected {expected_tag:#x}")
-
-        length = self.data[self.offset]
-        self.offset += 1
-        if length & 0x80:
-            length_size = length & 0x7F
-            if length_size == 0 or length_size > 4:
-                raise ValueError("Unsupported DER length")
-            length = int.from_bytes(self.data[self.offset:self.offset + length_size], "big")
-            self.offset += length_size
-
-        value = self.data[self.offset:self.offset + length]
-        self.offset += length
-        return tag, value
-
-    def read_integer(self):
-        _, value = self.read_tlv(0x02)
-        return int.from_bytes(value, "big")
-
-    def read_sequence(self):
-        _, value = self.read_tlv(0x30)
-        return _DerReader(value)
-
-    def read_octet_string(self):
-        _, value = self.read_tlv(0x04)
-        return value
-
-
-def _pem_to_der(private_key):
-    normalized_key = private_key.strip().replace("\\n", "\n")
-    lines = [
-        line.strip()
-        for line in normalized_key.splitlines()
-        if line and not line.startswith("-----")
-    ]
-    return base64.b64decode("".join(lines))
-
-
-def _read_rsa_private_numbers(private_key):
-    der = _pem_to_der(private_key)
-    sequence = _DerReader(der).read_sequence()
-    sequence.read_integer()
-
-    if sequence.data[sequence.offset] == 0x30:
-        sequence.read_sequence()
-        rsa_key = _DerReader(sequence.read_octet_string()).read_sequence()
-        rsa_key.read_integer()
-        return rsa_key.read_integer(), rsa_key.read_integer()
-
-    return sequence.read_integer(), sequence.read_integer()
-
-
 def _rsa_sha256_sign(private_key, signing_string):
-    modulus, private_exponent = _read_rsa_private_numbers(private_key)
-    key_size = (modulus.bit_length() + 7) // 8
-    digest = hashlib.sha256(signing_string.encode("utf-8")).digest()
-    digest_info = bytes.fromhex("3031300d060960864801650304020105000420") + digest
-    padding_length = key_size - len(digest_info) - 3
-    if padding_length < 8:
-        raise ValueError("OCI private key is too small for SHA-256 signing")
-
-    encoded_message = b"\x00\x01" + (b"\xff" * padding_length) + b"\x00" + digest_info
-    signature_int = pow(int.from_bytes(encoded_message, "big"), private_exponent, modulus)
-    return base64.b64encode(signature_int.to_bytes(key_size, "big")).decode("ascii")
+    normalized_key = private_key.strip().replace("\\n", "\n").encode("utf-8")
+    signer = serialization.load_pem_private_key(normalized_key, password=None)
+    signature = signer.sign(
+        signing_string.encode("utf-8"),
+        padding.PKCS1v15(),
+        hashes.SHA256(),
+    )
+    return base64.b64encode(signature).decode("ascii")
 
 
 def _to_namespace(value):

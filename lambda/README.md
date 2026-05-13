@@ -80,8 +80,9 @@ The shared layer should stay small:
 * Google Cloud Firestore client
 * Requests
 * QR code dependencies
+* Cryptography for OCI request signing
 
-The layer has not changed for OCI-over-HTTPS. The build is defined in [Dockerfile](Dockerfile). Rebuild only after dependency changes and attach the updated layer version to functions that import `firebase_admin`, `requests`, or `qrcode`.
+The OCI-over-HTTPS flow requires `cryptography` in the shared layer for request signing. The build is defined in [Dockerfile](Dockerfile). Rebuild after dependency changes and attach the updated layer version to functions that import `firebase_admin`, `requests`, `qrcode`, or `cryptography`.
 
 ## Layer Build
 
