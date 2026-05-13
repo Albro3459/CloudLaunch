@@ -26,6 +26,23 @@ const capitalized = (str: string) => {
     return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
+const getStatusBadgeClasses = (status: string) => {
+    switch (status.toLowerCase()) {
+        case "running":
+            return "bg-green-100 text-green-800 border-green-200";
+        case "pending":
+            return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        case "failed":
+            return "bg-red-100 text-red-800 border-red-200";
+        case "terminated":
+            return "bg-red-950 text-red-50 border-red-950";
+        default:
+            return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+};
+
+const canShowConfig = (status: string) => status.toLowerCase() === "running";
+
 const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean) => {
     return [...data].sort((a, b) => {
         if (!sortField) return 0;
@@ -45,6 +62,51 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
             ? String(aVal).localeCompare(String(bVal))
             : String(bVal).localeCompare(String(aVal));
     });
+};
+
+type VPNTableRowData = {
+    entry: VPNTableEntry;
+    isAdmin: boolean;
+    targets: Targets;
+    toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
+    onQRCodeClick: (ipv4: string, region: string | null) => void;
+};
+
+const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, targets, toggleTarget, onQRCodeClick }) => {
+    const configAvailable = canShowConfig(entry.status);
+
+    return (
+        <tr className="border-b border-gray-100 hover:bg-gray-50">
+            {isAdmin &&
+                <>
+                    <td className="px-4 py-4 flex justify-center items-center">
+                    <input
+                        type="checkbox"
+                        checked={targets?.[entry.userID]?.[entry.region || ""]?.includes(entry.instanceID) || false}
+                        onChange={(e) => toggleTarget(e.target.checked ? TOGGLE.ADD : TOGGLE.REMOVE, entry.userID, entry.region, entry.instanceID) }
+                    />
+                    </td>
+                    <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
+                </>
+            }
+            <td className="px-4 py-2 text-center">{getRegionName(entry.region) || "Null"}</td>
+            <td className="px-4 py-2 text-center">{entry.ipv4}</td>
+            <td className="px-4 py-2 text-center">
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(entry.status)}`}>
+                    {capitalized(entry.status)}
+                </span>
+            </td>
+            <td className="px-4 py-2 flex justify-center">
+                <button
+                    onClick={() => configAvailable && onQRCodeClick(entry.ipv4, entry.region)}
+                    disabled={!configAvailable}
+                    className={configAvailable ? "text-blue-600 hover:text-blue-800" : "text-gray-300 cursor-not-allowed"}
+                >
+                    <QrCode size={20} />
+                </button>
+            </td>
+        </tr>
+    );
 };
 
 export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
@@ -159,33 +221,15 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                                 </td>
                             </tr>
                         )}
-                        {data && data.length > 0 && sortedData(data, sortField, sortAsc).map((entry, index) => (
-                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                                {isAdmin &&
-                                    <>
-                                        <td className="px-4 py-4 flex justify-center items-center">
-                                        <input 
-                                            type="checkbox"
-                                            checked={targets?.[entry.userID]?.[entry.region || ""]?.includes(entry.instanceID) || false}
-                                            onChange={(e) => toggleTarget(e.target.checked ? TOGGLE.ADD : TOGGLE.REMOVE, entry.userID, entry.region, entry.instanceID) }
-                                        />
-                                        </td>
-                                        <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
-                                    </>
-                                }
-                                <td className="px-4 py-2 text-center">{getRegionName(entry.region) || "Null"}</td>
-                                <td className="px-4 py-2 text-center">{entry.ipv4}</td>
-                                <td className="px-4 py-2 text-center">{capitalized(entry.status)}</td>
-                                <td className="px-4 py-2 flex justify-center">
-                                    <button
-                                        onClick={() => onQRCodeClick(entry.ipv4, entry.region)}
-                                        // disabled={keyStore.loading || !keyStore.keys}
-                                        className="text-blue-600 hover:text-blue-800"
-                                    >
-                                        <QrCode size={20} />
-                                    </button>
-                                </td>
-                            </tr>
+                        {data && data.length > 0 && sortedData(data, sortField, sortAsc).map((entry) => (
+                            <VPNTableRow
+                                key={entry.instanceID}
+                                entry={entry}
+                                isAdmin={isAdmin}
+                                targets={targets}
+                                toggleTarget={toggleTarget}
+                                onQRCodeClick={onQRCodeClick}
+                            />
                         ))}
                     </tbody>
                 </table>
