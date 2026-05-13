@@ -1,22 +1,14 @@
 # Lambda Setup
 
-This Lambda code expects a shared Python layer and several AWS Secrets Manager secrets to exist before the functions are deployed.
+This Lambda code expects a shared Python layer and one AWS Secrets Manager secret to exist before the functions are deployed.
 
 ## Required Secrets
 
-Create these AWS Secrets Manager secrets:
+Create one AWS Secrets Manager secret:
 
-* `FirebaseServiceAccount`
-  * Used by the Lambda functions that call `firebase_admin`.
-  * Use the example at [FirebaseServiceAccount.example](secrets/FirebaseServiceAccount.example) as the template for the secret payload.
-
-* `VPN-Config`
-  * Used for deployment configuration, WireGuard values, SES sender settings, and other runtime values.
-  * Use the example at [VPN-Config.example](secrets/VPN-Config.example) as the template for the secret payload.
-
-* `OCI-Auth`
-  * Used by the deploy Lambda for OCI REST API request signing.
-  * Use the example at [OCI-Auth.example](secrets/OCI-Auth.example) as the template for the secret payload.
+* `CloudLaunch`
+  * Used by all Lambda functions for Firebase, AWS app config, OCI signing/deployment values, and WireGuard runtime values.
+  * Use [CloudLaunch.example](secrets/CloudLaunch.example) as the template for the secret payload.
 
 ## OCI Deployment
 
@@ -24,18 +16,20 @@ The `Deploy` Lambda manages Oracle Cloud Infrastructure over HTTPS with signed R
 
 The Lambda needs outbound egress to public OCI API endpoints for Resource Manager, Compute, and Virtual Network calls. If the Lambda runs outside a VPC, normal Lambda internet egress should be enough. If it is attached to private VPC subnets, configure a NAT gateway or another approved outbound path.
 
-`OCI-Auth` contains only OCI request-signing values:
+The `CloudLaunch` secret keeps OCI request-signing values in the top-level `oci` object:
 
 ```json
 {
-  "OCI_USER_OCID": "...",
-  "OCI_TENANCY_OCID": "...",
-  "OCI_FINGERPRINT": "...",
-  "OCI_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+  "oci": {
+    "OCI_USER_OCID": "...",
+    "OCI_TENANCY_OCID": "...",
+    "OCI_FINGERPRINT": "...",
+    "OCI_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+  }
 }
 ```
 
-In OCI, create or choose an automation user, add an API signing key, and grant only the policies needed to manage Resource Manager stacks/jobs, inspect or terminate compute instances, and read VNIC details. Keep Terraform/runtime values in `VPN-Config`, not `OCI-Auth`.
+In OCI, create or choose an automation user, add an API signing key, and grant only the policies needed to manage Resource Manager stacks/jobs, inspect or terminate compute instances, and read VNIC details. Keep Terraform and WireGuard values in the `oci` and `vpn` objects shown in [CloudLaunch.example](secrets/CloudLaunch.example).
 
 ## Required Lambda Layer
 

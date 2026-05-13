@@ -6,27 +6,27 @@ from role_manager import get_max_count_for_role, get_user_vpn_count, increment_u
 from firebase import (
     get_instance,
     get_user_instances_in_region,
-    get_live_regions,
     initialize_firebase,
     mark_instance_terminated,
     record_instance_cleanup_error,
     verify_firebase_token,
     get_user_role,
 )
-from get_secrets import get_secret
+from get_secrets import (
+    AwsSecretKey,
+    OciSecretKey,
+    SecretSection,
+    VpnSecretKey,
+    get_cloudlaunch_secret,
+    get_secret_section,
+    get_secret_value,
+)
 from notify import deliver_emails
 from config_helper import get_wireguard_config_options
 
 AWS_REGION = "us-west-1"
 
-FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
-DEPLOY_SECRET_NAME = "VPN-Config"
-OCI_AUTH_SECRET_NAME = "OCI-Auth"
-
 VALID_ACTIONS = {"deploy", "terminate"}
-
-OCI_REGION = "us-sanjose-1"
-OCI_REGION_NAME = "San Jose"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -52,7 +52,6 @@ def _record_cleanup_error_safely(uid, region, instance_id, error_message):
 def lambda_handler(event, context):
     """
     Handles incoming Lambda requests
-    Takes in 'region' and 'instance_name' in the event body
     Token is extracted from the 'Authorization' header
     """
     headers = event.get("headers", {})
@@ -80,7 +79,6 @@ def lambda_handler(event, context):
     
         # Deploy params (Required for Deploy)
     email = (body.get("email") or "").strip()
-    target_region = (body.get("target_region") or "").strip()    
 
     # Validate input
     if not token:
@@ -97,42 +95,37 @@ def lambda_handler(event, context):
         }        
         
     # Fetch secrets
-    vpn_config_secret = get_secret(DEPLOY_SECRET_NAME, AWS_REGION)
-    if not vpn_config_secret:
+    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
+    if not cloudlaunch_secret:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
-    oci_auth_secret = get_secret(OCI_AUTH_SECRET_NAME, AWS_REGION)
-    if not oci_auth_secret:
+    try:
+        aws_config = get_secret_section(cloudlaunch_secret, SecretSection.AWS)
+        firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
+        oci_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
+        vpn_config = get_secret_section(cloudlaunch_secret, SecretSection.VPN)
+    except ValueError as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": f"Failed to retrieve required secret: {OCI_AUTH_SECRET_NAME}"})
-        }
-    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
-    if not firebaseSecrets:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+            "body": json.dumps({"error": str(e)})
         }
 
-    if vpn_config_secret.get("OCI_REGION") and vpn_config_secret.get("OCI_REGION") != OCI_REGION:
+    try:
+        client_private_key = get_secret_value(vpn_config, VpnSecretKey.CLIENT_PRIVATE_KEY)
+        server_public_key = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
+        sender = get_secret_value(aws_config, AwsSecretKey.SES_SENDER)
+        admin_email = get_secret_value(aws_config, AwsSecretKey.ADMIN_EMAIL)
+        oci_region = get_secret_value(oci_config, OciSecretKey.REGION)
+        oci_region_name = get_secret_value(oci_config, OciSecretKey.REGION_NAME)
+    except ValueError as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": "OCI secret region does not match configured OCI region"})
-        }
-
-    client_private_key = vpn_config_secret.get("WG_CLIENT_PRIVATE_KEY")
-    server_public_key = vpn_config_secret.get("WG_SERVER_PUBLIC_KEY")
-    sender = vpn_config_secret.get("SES_SENDER")
-    admin_email = vpn_config_secret.get("ADMIN_EMAIL")
-    if not client_private_key or not server_public_key or not sender or not admin_email:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Missing required secret values"})
+            "body": json.dumps({"error": str(e)})
         }
     try:
-        wireguard_options = get_wireguard_config_options(vpn_config_secret)
+        wireguard_options = get_wireguard_config_options(vpn_config)
     except ValueError as e:
         return {
             "statusCode": 500,
@@ -179,8 +172,8 @@ def lambda_handler(event, context):
 
                     try:
                         cleanup_result = terminate_instance_resources(
-                            oci_auth_secret,
-                            OCI_REGION,
+                            oci_config,
+                            oci_region,
                             stack_id=stack_id,
                             instance_ocid=instance_ocid,
                         )
@@ -241,18 +234,11 @@ def lambda_handler(event, context):
         }
         
     elif action.lower() == "deploy":
-        if not email or not target_region:
-            print(f"Missing required parameters: {email}, {target_region}")
+        if not email:
+            print(f"Missing required parameters: {email}")
             return {
                 "statusCode": 400,
                 "body": json.dumps({"error": f"Missing required parameters"})
-            }
-            
-        live_regions = get_live_regions()
-        if target_region not in [r["value"] for r in live_regions]:
-            return {
-                "statusCode": 400,
-                "body": json.dumps({"error": "Target region is not live"})
             }
         
         # Check if the user can make more VPNs
@@ -264,22 +250,24 @@ def lambda_handler(event, context):
                     
         # Make sure there are no running instances in the region for that user
         # if there are, just return that instance ID
-        vpn = get_user_instances_in_region(user_id, role, target_region)
+        vpn = get_user_instances_in_region(user_id, role, oci_region)
         if vpn:
             instance_ip = list(vpn.values())[0][0]["ipv4"]
-            print(f"VPN {instance_ip} already exists in region {target_region} for user {user_id}")
+            print(f"VPN {instance_ip} already exists in region {oci_region} for user {user_id}")
             return {
                 "statusCode": 200,
                 "body": json.dumps({
                     "isNew": False,
                     "public_ipv4": instance_ip,
                     "client_private_key": client_private_key,
-                    "server_public_key": server_public_key
+                    "server_public_key": server_public_key,
+                    "region": oci_region,
+                    "region_name": oci_region_name,
                 })
             }
 
         # Deploy the OCI instance through Resource Manager
-        result = deploy_instance(vpn_config_secret, oci_auth_secret, user_id, target_region)
+        result = deploy_instance(oci_config, vpn_config, user_id, oci_region)
         if result["error"]:
             return {
                 "statusCode": 500,
@@ -305,7 +293,7 @@ def lambda_handler(event, context):
             client_private_key,
             server_public_key,
             public_ip,
-            OCI_REGION_NAME,
+            oci_region_name,
             sender,
             emails,
             wireguard_options,
@@ -317,7 +305,9 @@ def lambda_handler(event, context):
                 "isNew": True,
                 "public_ipv4": public_ip,
                 "client_private_key": client_private_key,
-                "server_public_key": server_public_key
+                "server_public_key": server_public_key,
+                "region": oci_region,
+                "region_name": oci_region_name,
             })
         }
     else:

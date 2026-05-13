@@ -2,10 +2,9 @@ import json
 from firebase_admin import auth, firestore
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
-from get_secrets import get_secret
+from get_secrets import SecretSection, get_cloudlaunch_secret, get_secret_section
 
 AWS_REGION = "us-west-1"
-FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
 
 def create_auth_user(email, password):
     try:
@@ -59,11 +58,18 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
-    if not firebaseSecrets:
+    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
+    if not cloudlaunch_secret:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+        }
+    try:
+        firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
+    except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
         }
     
     # Verify token

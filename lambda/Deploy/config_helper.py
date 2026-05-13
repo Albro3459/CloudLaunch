@@ -1,18 +1,18 @@
 import qrcode
 from io import BytesIO
 
-from get_secrets import get_secret_value
+from get_secrets import VpnSecretKey, get_secret_value
 
 def get_wireguard_config_options(secret_values):
     return {
-        "address_v4": str(get_secret_value(secret_values, "WG_CLIENT_ADDRESS_V4")),
-        "address_v6": str(get_secret_value(secret_values, "WG_CLIENT_ADDRESS_V6")),
-        "dns_v4": str(get_secret_value(secret_values, "WG_DNS_ADDRESS_V4")),
-        "dns_v6": str(get_secret_value(secret_values, "WG_DNS_ADDRESS_V6")),
-        "listen_port": str(get_secret_value(secret_values, "WG_LISTEN_PORT")),
-        "allowed_ips_v4": str(get_secret_value(secret_values, "WG_CLIENT_ALLOWED_IPS_V4")),
-        "allowed_ips_v6": str(get_secret_value(secret_values, "WG_CLIENT_ALLOWED_IPS_V6")),
-        "persistent_keepalive": str(get_secret_value(secret_values, "WG_PEER_PERSISTENT_KEEPALIVE")),
+        "address_v4": str(get_secret_value(secret_values, VpnSecretKey.CLIENT_ADDRESS_V4)),
+        "address_v6": str(get_secret_value(secret_values, VpnSecretKey.CLIENT_ADDRESS_V6)),
+        "dns_v4": str(get_secret_value(secret_values, VpnSecretKey.DNS_ADDRESS_V4)),
+        "dns_v6": str(get_secret_value(secret_values, VpnSecretKey.DNS_ADDRESS_V6)),
+        "listen_port": str(get_secret_value(secret_values, VpnSecretKey.LISTEN_PORT)),
+        "allowed_ips_v4": str(get_secret_value(secret_values, VpnSecretKey.CLIENT_ALLOWED_IPS_V4)),
+        "allowed_ips_v6": str(get_secret_value(secret_values, VpnSecretKey.CLIENT_ALLOWED_IPS_V6)),
+        "persistent_keepalive": str(get_secret_value(secret_values, VpnSecretKey.PEER_PERSISTENT_KEEPALIVE)),
     }
 
 def get_config(client_private_key, server_public_key, ip_address, wireguard_options):

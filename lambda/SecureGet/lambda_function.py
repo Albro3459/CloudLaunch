@@ -1,11 +1,15 @@
 import json
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
-from get_secrets import get_secret
+from get_secrets import (
+    SecretSection,
+    VpnSecretKey,
+    get_cloudlaunch_secret,
+    get_secret_section,
+    get_secret_value,
+)
 
 AWS_REGION = "us-west-1"
-FIREBASE_SECRET_NAME = "FirebaseServiceAccount"
-DEPLOY_SECRET_NAME = "VPN-Config"
 
 def lambda_handler(event, context):
     """
@@ -35,17 +39,19 @@ def lambda_handler(event, context):
         }
 
     # Fetch secrets
-    secrets = get_secret(DEPLOY_SECRET_NAME, AWS_REGION)
-    if not secrets:
+    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
+    if not cloudlaunch_secret:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
-    firebaseSecrets = get_secret(FIREBASE_SECRET_NAME, AWS_REGION)
-    if not firebaseSecrets:
+    try:
+        firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
+        vpn_config = get_secret_section(cloudlaunch_secret, SecretSection.VPN)
+    except ValueError as e:
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+            "body": json.dumps({"error": str(e)})
         }
     
     # Verify token
@@ -58,13 +64,13 @@ def lambda_handler(event, context):
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
     
     
-    # Get AWS Secrets
+    # Return allowed secret values
     result = {}
     for key in requested_keys:
         if key == "client_private_key":
-            result[key] = secrets.get("WG_CLIENT_PRIVATE_KEY")
+            result[key] = get_secret_value(vpn_config, VpnSecretKey.CLIENT_PRIVATE_KEY)
         elif key == "server_public_key":
-            result[key] = secrets.get("WG_SERVER_PUBLIC_KEY")
+            result[key] = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
         else:
             result[key] = None # Explicitly show unknown keys
 

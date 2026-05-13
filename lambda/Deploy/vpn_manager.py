@@ -14,7 +14,7 @@ from firebase import (
     mark_instance_running,
     upsert_stack_backed_instance_record,
 )
-from get_secrets import get_secret_value
+from get_secrets import OciSecretKey, VpnSecretKey, get_secret_value
 
 STACK_CREATE_TIMEOUT_SECONDS = 300
 JOB_TIMEOUT_SECONDS = 1800
@@ -29,10 +29,10 @@ STACK_TERRAFORM_FILES = (
 
 def _get_oci_config(auth_secret_values, region):
     config = {
-        "user": get_secret_value(auth_secret_values, "OCI_USER_OCID"),
-        "tenancy": get_secret_value(auth_secret_values, "OCI_TENANCY_OCID"),
-        "fingerprint": get_secret_value(auth_secret_values, "OCI_FINGERPRINT"),
-        "key_content": get_secret_value(auth_secret_values, "OCI_PRIVATE_KEY"),
+        "user": get_secret_value(auth_secret_values, OciSecretKey.USER_OCID),
+        "tenancy": get_secret_value(auth_secret_values, OciSecretKey.TENANCY_OCID),
+        "fingerprint": get_secret_value(auth_secret_values, OciSecretKey.FINGERPRINT),
+        "key_content": get_secret_value(auth_secret_values, OciSecretKey.PRIVATE_KEY),
         "region": region,
     }
 
@@ -75,43 +75,43 @@ def _build_display_name(user_id):
     normalized_user_id = _normalize_name(user_id)
     return f"VPN-{normalized_user_id}-{timestamp}"
 
-def _build_stack_variables(secret_values, instance_name):
-    ssh_authorized_keys = secret_values.get("OCI_SSH_AUTHORIZED_KEYS_JSON")
+def _build_stack_variables(oci_config, vpn_config, instance_name):
+    ssh_authorized_keys = oci_config.get(OciSecretKey.SSH_AUTHORIZED_KEYS_JSON.value)
     if isinstance(ssh_authorized_keys, str):
         ssh_authorized_keys = json.loads(ssh_authorized_keys)
     if not isinstance(ssh_authorized_keys, list) or not ssh_authorized_keys:
-        raise ValueError("OCI_SSH_AUTHORIZED_KEYS_JSON must be a JSON array of SSH public keys")
+        raise ValueError("oci.OCI_SSH_AUTHORIZED_KEYS_JSON must be a JSON array of SSH public keys")
 
     variables = {
-        "availability_domain": get_secret_value(secret_values, "OCI_AVAILABILITY_DOMAIN"),
-        "compartment_id": get_secret_value(secret_values, "OCI_COMPARTMENT_ID"),
-        "subnet_id": get_secret_value(secret_values, "OCI_SUBNET_ID"),
-        "source_image_id": get_secret_value(secret_values, "OCI_SOURCE_IMAGE_ID"),
+        "availability_domain": get_secret_value(oci_config, OciSecretKey.AVAILABILITY_DOMAIN),
+        "compartment_id": get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
+        "subnet_id": get_secret_value(oci_config, OciSecretKey.SUBNET_ID),
+        "source_image_id": get_secret_value(oci_config, OciSecretKey.SOURCE_IMAGE_ID),
         "ssh_authorized_keys": json.dumps(ssh_authorized_keys),
-        "hashed_password": get_secret_value(secret_values, "OCI_HASHED_PASSWORD"),
+        "hashed_password": get_secret_value(oci_config, OciSecretKey.HASHED_PASSWORD),
         "instance_display_name": instance_name,
         "vnic_display_name": instance_name,
-        "ipv6_subnet_cidr": get_secret_value(secret_values, "OCI_IPV6_SUBNET_CIDR"),
-        "shape": get_secret_value(secret_values, "OCI_INSTANCE_SHAPE"),
-        "shape_memory_in_gbs": str(get_secret_value(secret_values, "OCI_INSTANCE_MEMORY_GBS")),
-        "shape_ocpus": str(get_secret_value(secret_values, "OCI_INSTANCE_OCPUS")),
-        "boot_volume_size_in_gbs": str(get_secret_value(secret_values, "OCI_BOOT_VOLUME_SIZE_GBS")),
-        "boot_volume_vpus_per_gb": str(get_secret_value(secret_values, "OCI_BOOT_VOLUME_VPUS_PER_GB")),
-        "wg_interface": get_secret_value(secret_values, "WG_INTERFACE"),
-        "wg_listen_port": str(get_secret_value(secret_values, "WG_LISTEN_PORT")),
-        "wg_address_v4": get_secret_value(secret_values, "WG_ADDRESS_V4"),
-        "wg_address_v6": get_secret_value(secret_values, "WG_ADDRESS_V6"),
-        "wg_dns_address_v4": get_secret_value(secret_values, "WG_DNS_ADDRESS_V4"),
-        "wg_dns_address_v6": get_secret_value(secret_values, "WG_DNS_ADDRESS_V6"),
-        "wg_network_v4": get_secret_value(secret_values, "WG_NETWORK_V4"),
-        "wg_network_v6": get_secret_value(secret_values, "WG_NETWORK_V6"),
-        "wg_rate_limit": get_secret_value(secret_values, "WG_RATE_LIMIT"),
-        "wg_rate_limit_burst": str(get_secret_value(secret_values, "WG_RATE_LIMIT_BURST")),
-        "wg_server_private_key": get_secret_value(secret_values, "WG_SERVER_PRIVATE_KEY"),
-        "wg_client_public_key": get_secret_value(secret_values, "WG_CLIENT_PUBLIC_KEY"),
-        "wg_peer_allowed_ipv4": get_secret_value(secret_values, "WG_PEER_ALLOWED_IPV4"),
-        "wg_peer_allowed_ipv6": get_secret_value(secret_values, "WG_PEER_ALLOWED_IPV6"),
-        "wg_peer_persistent_keepalive": str(get_secret_value(secret_values, "WG_PEER_PERSISTENT_KEEPALIVE")),
+        "ipv6_subnet_cidr": get_secret_value(oci_config, OciSecretKey.IPV6_SUBNET_CIDR),
+        "shape": get_secret_value(oci_config, OciSecretKey.INSTANCE_SHAPE),
+        "shape_memory_in_gbs": str(get_secret_value(oci_config, OciSecretKey.INSTANCE_MEMORY_GBS)),
+        "shape_ocpus": str(get_secret_value(oci_config, OciSecretKey.INSTANCE_OCPUS)),
+        "boot_volume_size_in_gbs": str(get_secret_value(oci_config, OciSecretKey.BOOT_VOLUME_SIZE_GBS)),
+        "boot_volume_vpus_per_gb": str(get_secret_value(oci_config, OciSecretKey.BOOT_VOLUME_VPUS_PER_GB)),
+        "wg_interface": get_secret_value(vpn_config, VpnSecretKey.INTERFACE),
+        "wg_listen_port": str(get_secret_value(vpn_config, VpnSecretKey.LISTEN_PORT)),
+        "wg_address_v4": get_secret_value(vpn_config, VpnSecretKey.ADDRESS_V4),
+        "wg_address_v6": get_secret_value(vpn_config, VpnSecretKey.ADDRESS_V6),
+        "wg_dns_address_v4": get_secret_value(vpn_config, VpnSecretKey.DNS_ADDRESS_V4),
+        "wg_dns_address_v6": get_secret_value(vpn_config, VpnSecretKey.DNS_ADDRESS_V6),
+        "wg_network_v4": get_secret_value(vpn_config, VpnSecretKey.NETWORK_V4),
+        "wg_network_v6": get_secret_value(vpn_config, VpnSecretKey.NETWORK_V6),
+        "wg_rate_limit": get_secret_value(vpn_config, VpnSecretKey.RATE_LIMIT),
+        "wg_rate_limit_burst": str(get_secret_value(vpn_config, VpnSecretKey.RATE_LIMIT_BURST)),
+        "wg_server_private_key": get_secret_value(vpn_config, VpnSecretKey.SERVER_PRIVATE_KEY),
+        "wg_client_public_key": get_secret_value(vpn_config, VpnSecretKey.CLIENT_PUBLIC_KEY),
+        "wg_peer_allowed_ipv4": get_secret_value(vpn_config, VpnSecretKey.PEER_ALLOWED_IPV4),
+        "wg_peer_allowed_ipv6": get_secret_value(vpn_config, VpnSecretKey.PEER_ALLOWED_IPV6),
+        "wg_peer_persistent_keepalive": str(get_secret_value(vpn_config, VpnSecretKey.PEER_PERSISTENT_KEEPALIVE)),
     }
 
     return variables
@@ -142,16 +142,16 @@ def _wait_for_job(resource_manager_client, job_id, timeout_seconds):
 
     raise TimeoutError(f"Timed out waiting for job {job_id} to finish")
 
-def _create_stack(resource_manager_client, secret_values, user_id):
+def _create_stack(resource_manager_client, oci_config, vpn_config, user_id):
     stack_name = _build_display_name(user_id)
     stack_details = oci.resource_manager.models.CreateStackDetails(
-        compartment_id=get_secret_value(secret_values, "OCI_COMPARTMENT_ID"),
+        compartment_id=get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
         display_name=stack_name,
         description=f"CloudLaunch VPN stack for {user_id}",
         config_source=oci.resource_manager.models.CreateZipUploadConfigSourceDetails(
             zip_file_base64_encoded=_zip_terraform_package()
         ),
-        variables=_build_stack_variables(secret_values, stack_name),
+        variables=_build_stack_variables(oci_config, vpn_config, stack_name),
         freeform_tags={
             "managed-by": "cloudlaunch",
             "vpn-user-id": user_id,
@@ -374,25 +374,25 @@ def _destroy_stack(resource_manager_client, stack_id):
         }
 
 
-def _safe_mark_instance_failed(user_id, target_region, stack_id, error_message):
+def _safe_mark_instance_failed(user_id, oci_region, stack_id, error_message):
     try:
-        mark_instance_failed(user_id, target_region, stack_id, error_message)
+        mark_instance_failed(user_id, oci_region, stack_id, error_message)
     except Exception as exc:
         print(f"Failed to persist Deploy record failure for stack {stack_id}: {exc}")
 
 
-def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
+def deploy_instance(oci_config, vpn_config, user_id, oci_region):
     stack = None
     instance_id = None
 
     try:
-        clients = _get_clients(auth_secret_values, target_region)
+        clients = _get_clients(oci_config, oci_region)
         resource_manager_client = clients["resource_manager"]
         compute_client = clients["compute"]
         virtual_network_client = clients["virtual_network"]
 
-        stack = _create_stack(resource_manager_client, secret_values, user_id)
-        upsert_stack_backed_instance_record(user_id, target_region, stack.id, stack.display_name)
+        stack = _create_stack(resource_manager_client, oci_config, vpn_config, user_id)
+        upsert_stack_backed_instance_record(user_id, oci_region, stack.id, stack.display_name)
 
         apply_job = _create_job(
             resource_manager_client,
@@ -412,16 +412,16 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
         if not instance_id:
             raise RuntimeError("OCI apply completed but instance OCID could not be resolved from Terraform state")
 
-        attach_instance_ocid(user_id, target_region, stack.id, instance_id)
+        attach_instance_ocid(user_id, oci_region, stack.id, instance_id)
 
         public_ip = _get_instance_public_ip(
             compute_client,
             virtual_network_client,
-            get_secret_value(secret_values, "OCI_COMPARTMENT_ID"),
+            get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
             instance_id,
         )
 
-        mark_instance_running(user_id, target_region, stack.id, public_ip)
+        mark_instance_running(user_id, oci_region, stack.id, public_ip)
         return {
             "error": None,
             "instance_id": instance_id,
@@ -433,7 +433,7 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
         error = f"OCI deployment failed: {e}"
         print(error)
         if stack is not None:
-            _safe_mark_instance_failed(user_id, target_region, stack.id, error)
+            _safe_mark_instance_failed(user_id, oci_region, stack.id, error)
         return {
             "error": error,
             "instance_id": instance_id,
@@ -442,8 +442,8 @@ def deploy_instance(secret_values, auth_secret_values, user_id, target_region):
             "stack_id": getattr(stack, "id", None),
         }
 
-def terminate_instance_resources(auth_secret_values, target_region, stack_id=None, instance_ocid=None):
-    clients = _get_clients(auth_secret_values, target_region)
+def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, instance_ocid=None):
+    clients = _get_clients(auth_secret_values, oci_region)
     resource_manager_client = clients["resource_manager"]
     compute_client = clients["compute"]
 
