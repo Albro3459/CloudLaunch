@@ -1,12 +1,16 @@
 import base64
+import hashlib
 import json
 import re
 import time
 import zipfile
+from email.utils import formatdate
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import quote
 
-import oci
+import requests
 
 from firebase import (
     attach_instance_ocid,
@@ -27,24 +31,263 @@ STACK_TERRAFORM_FILES = (
     "backdoor-cloud-init.yaml",
 )
 
-def _get_oci_config(auth_secret_values, region):
-    config = {
+class OciServiceError(Exception):
+    def __init__(self, status, code, message):
+        super().__init__(f"OCI API returned {status} {code}: {message}")
+        self.status = status
+        self.code = code
+
+
+class _DerReader:
+    def __init__(self, data):
+        self.data = data
+        self.offset = 0
+
+    def read_tlv(self, expected_tag=None):
+        if self.offset >= len(self.data):
+            raise ValueError("Unexpected end of DER data")
+
+        tag = self.data[self.offset]
+        self.offset += 1
+        if expected_tag is not None and tag != expected_tag:
+            raise ValueError(f"Unexpected DER tag {tag:#x}; expected {expected_tag:#x}")
+
+        length = self.data[self.offset]
+        self.offset += 1
+        if length & 0x80:
+            length_size = length & 0x7F
+            if length_size == 0 or length_size > 4:
+                raise ValueError("Unsupported DER length")
+            length = int.from_bytes(self.data[self.offset:self.offset + length_size], "big")
+            self.offset += length_size
+
+        value = self.data[self.offset:self.offset + length]
+        self.offset += length
+        return tag, value
+
+    def read_integer(self):
+        _, value = self.read_tlv(0x02)
+        return int.from_bytes(value, "big")
+
+    def read_sequence(self):
+        _, value = self.read_tlv(0x30)
+        return _DerReader(value)
+
+    def read_octet_string(self):
+        _, value = self.read_tlv(0x04)
+        return value
+
+
+def _pem_to_der(private_key):
+    normalized_key = private_key.strip().replace("\\n", "\n")
+    lines = [
+        line.strip()
+        for line in normalized_key.splitlines()
+        if line and not line.startswith("-----")
+    ]
+    return base64.b64decode("".join(lines))
+
+
+def _read_rsa_private_numbers(private_key):
+    der = _pem_to_der(private_key)
+    sequence = _DerReader(der).read_sequence()
+    sequence.read_integer()
+
+    if sequence.data[sequence.offset] == 0x30:
+        sequence.read_sequence()
+        rsa_key = _DerReader(sequence.read_octet_string()).read_sequence()
+        rsa_key.read_integer()
+        return rsa_key.read_integer(), rsa_key.read_integer()
+
+    return sequence.read_integer(), sequence.read_integer()
+
+
+def _rsa_sha256_sign(private_key, signing_string):
+    modulus, private_exponent = _read_rsa_private_numbers(private_key)
+    key_size = (modulus.bit_length() + 7) // 8
+    digest = hashlib.sha256(signing_string.encode("utf-8")).digest()
+    digest_info = bytes.fromhex("3031300d060960864801650304020105000420") + digest
+    padding_length = key_size - len(digest_info) - 3
+    if padding_length < 8:
+        raise ValueError("OCI private key is too small for SHA-256 signing")
+
+    encoded_message = b"\x00\x01" + (b"\xff" * padding_length) + b"\x00" + digest_info
+    signature_int = pow(int.from_bytes(encoded_message, "big"), private_exponent, modulus)
+    return base64.b64encode(signature_int.to_bytes(key_size, "big")).decode("ascii")
+
+
+def _to_namespace(value):
+    if isinstance(value, list):
+        return [_to_namespace(item) for item in value]
+    if isinstance(value, dict):
+        return SimpleNamespace(**{
+            _to_snake_case(key): _to_namespace(item)
+            for key, item in value.items()
+        })
+    return value
+
+
+def _to_snake_case(value):
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).replace("-", "_").lower()
+
+
+class OciResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class OciSignedRestClient:
+    def __init__(self, auth, service, api_version):
+        self.auth = auth
+        self.host = f"{service}.{auth['region']}.oraclecloud.com"
+        self.api_version = api_version
+
+    def get(self, path, params=None, raw_text=False):
+        return self._request("GET", path, params=params, raw_text=raw_text)
+
+    def post(self, path, payload):
+        return self._request("POST", path, payload=payload)
+
+    def delete(self, path, params=None):
+        return self._request("DELETE", path, params=params)
+
+    def _request(self, method, path, params=None, payload=None, raw_text=False):
+        target = f"/{self.api_version}{path}"
+        if params:
+            query = "&".join(
+                f"{quote(str(key), safe='-._~')}={quote(str(value), safe='-._~')}"
+                for key, value in params.items()
+                if value is not None
+            )
+            if query:
+                target = f"{target}?{query}"
+
+        url = f"https://{self.host}{target}"
+        body = b""
+        headers = {
+            "accept": "application/json",
+            "date": formatdate(timeval=None, localtime=False, usegmt=True),
+            "host": self.host,
+        }
+        signed_headers = ["(request-target)", "host", "date"]
+
+        if method in {"POST", "PUT"}:
+            body = json.dumps(payload or {}, separators=(",", ":")).encode("utf-8")
+            headers.update({
+                "content-length": str(len(body)),
+                "content-type": "application/json",
+                "x-content-sha256": base64.b64encode(hashlib.sha256(body).digest()).decode("ascii"),
+            })
+            signed_headers.extend(["x-content-sha256", "content-type", "content-length"])
+
+        headers["authorization"] = self._build_authorization_header(method, target, headers, signed_headers)
+        response = requests.request(method, url, headers=headers, data=body, timeout=30)
+        if response.status_code >= 400:
+            raise _build_oci_error(response)
+        if raw_text:
+            return OciResponse(response.text)
+        if not response.text:
+            return OciResponse(None)
+        return OciResponse(_to_namespace(response.json()))
+
+    def _build_authorization_header(self, method, target, headers, signed_headers):
+        signing_values = {
+            "(request-target)": f"{method.lower()} {target}",
+            **headers,
+        }
+        signing_string = "\n".join(
+            f"{header}: {signing_values[header]}"
+            for header in signed_headers
+        )
+        signature = _rsa_sha256_sign(self.auth["private_key"], signing_string)
+        key_id = f"{self.auth['tenancy']}/{self.auth['user']}/{self.auth['fingerprint']}"
+        return (
+            'Signature version="1",'
+            f'keyId="{key_id}",'
+            'algorithm="rsa-sha256",'
+            f'headers="{" ".join(signed_headers)}",'
+            f'signature="{signature}"'
+        )
+
+
+def _build_oci_error(response):
+    code = "UNKNOWN"
+    message = response.text
+    try:
+        body = response.json()
+        code = body.get("code") or code
+        message = body.get("message") or message
+    except ValueError:
+        pass
+    return OciServiceError(response.status_code, code, message)
+
+
+class ResourceManagerClient:
+    def __init__(self, auth):
+        self.client = OciSignedRestClient(auth, "resourcemanager", "20180917")
+
+    def create_stack(self, details):
+        return self.client.post("/stacks", details)
+
+    def get_stack(self, stack_id):
+        return self.client.get(f"/stacks/{quote(stack_id, safe='')}")
+
+    def create_job(self, details):
+        return self.client.post("/jobs", details)
+
+    def get_job(self, job_id):
+        return self.client.get(f"/jobs/{quote(job_id, safe='')}")
+
+    def get_job_tf_state(self, job_id):
+        return self.client.get(f"/jobs/{quote(job_id, safe='')}/tfState", raw_text=True)
+
+
+class ComputeClient:
+    def __init__(self, auth):
+        self.client = OciSignedRestClient(auth, "iaas", "20160918")
+
+    def get_instance(self, instance_id):
+        return self.client.get(f"/instances/{quote(instance_id, safe='')}")
+
+    def terminate_instance(self, instance_id):
+        return self.client.delete(
+            f"/instances/{quote(instance_id, safe='')}",
+            params={"preserveBootVolume": "false"},
+        )
+
+    def list_vnic_attachments(self, compartment_id, instance_id):
+        return self.client.get(
+            "/vnicAttachments",
+            params={
+                "compartmentId": compartment_id,
+                "instanceId": instance_id,
+            },
+        )
+
+
+class VirtualNetworkClient:
+    def __init__(self, auth):
+        self.client = OciSignedRestClient(auth, "iaas", "20160918")
+
+    def get_vnic(self, vnic_id):
+        return self.client.get(f"/vnics/{quote(vnic_id, safe='')}")
+
+
+def _get_oci_auth(auth_secret_values, region):
+    return {
         "user": get_secret_value(auth_secret_values, OciSecretKey.USER_OCID),
         "tenancy": get_secret_value(auth_secret_values, OciSecretKey.TENANCY_OCID),
         "fingerprint": get_secret_value(auth_secret_values, OciSecretKey.FINGERPRINT),
-        "key_content": get_secret_value(auth_secret_values, OciSecretKey.PRIVATE_KEY),
+        "private_key": get_secret_value(auth_secret_values, OciSecretKey.PRIVATE_KEY),
         "region": region,
     }
 
-    oci.config.validate_config(config)
-    return config
-
 def _get_clients(auth_secret_values, region):
-    config = _get_oci_config(auth_secret_values, region)
+    auth = _get_oci_auth(auth_secret_values, region)
     return {
-        "resource_manager": oci.resource_manager.ResourceManagerClient(config),
-        "compute": oci.core.ComputeClient(config),
-        "virtual_network": oci.core.VirtualNetworkClient(config),
+        "resource_manager": ResourceManagerClient(auth),
+        "compute": ComputeClient(auth),
+        "virtual_network": VirtualNetworkClient(auth),
     }
 
 def _get_terraform_directory():
@@ -144,28 +387,32 @@ def _wait_for_job(resource_manager_client, job_id, timeout_seconds):
 
 def _create_stack(resource_manager_client, oci_config, vpn_config, user_id):
     stack_name = _build_display_name(user_id)
-    stack_details = oci.resource_manager.models.CreateStackDetails(
-        compartment_id=get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
-        display_name=stack_name,
-        description=f"CloudLaunch VPN stack for {user_id}",
-        config_source=oci.resource_manager.models.CreateZipUploadConfigSourceDetails(
-            zip_file_base64_encoded=_zip_terraform_package()
-        ),
-        variables=_build_stack_variables(oci_config, vpn_config, stack_name),
-        freeform_tags={
+    stack_details = {
+        "compartmentId": get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
+        "displayName": stack_name,
+        "description": f"CloudLaunch VPN stack for {user_id}",
+        "configSource": {
+            "configSourceType": "ZIP_UPLOAD",
+            "zipFileBase64Encoded": _zip_terraform_package(),
+        },
+        "variables": _build_stack_variables(oci_config, vpn_config, stack_name),
+        "freeformTags": {
             "managed-by": "cloudlaunch",
             "vpn-user-id": user_id,
         },
-    )
+    }
     stack = resource_manager_client.create_stack(stack_details).data
     return _wait_for_stack_state(resource_manager_client, stack.id, {"ACTIVE"}, STACK_CREATE_TIMEOUT_SECONDS)
 
-def _create_job(resource_manager_client, stack_id, operation_details, display_name):
-    job_details = oci.resource_manager.models.CreateJobDetails(
-        stack_id=stack_id,
-        display_name=display_name,
-        job_operation_details=operation_details,
-    )
+def _create_job(resource_manager_client, stack_id, operation, display_name):
+    job_details = {
+        "stackId": stack_id,
+        "displayName": display_name,
+        "jobOperationDetails": {
+            "operation": operation,
+            "executionPlanStrategy": "AUTO_APPROVED",
+        },
+    }
     return resource_manager_client.create_job(job_details).data
 
 def _get_instance_ocid_from_state(tf_state):
@@ -326,9 +573,7 @@ def _destroy_stack(resource_manager_client, stack_id):
         destroy_job = _create_job(
             resource_manager_client,
             stack_id,
-            oci.resource_manager.models.CreateDestroyJobOperationDetails(
-                execution_plan_strategy="AUTO_APPROVED"
-            ),
+            "DESTROY",
             f"Destroy {stack_id}",
         )
         job = _wait_for_job(resource_manager_client, destroy_job.id, JOB_TIMEOUT_SECONDS)
@@ -397,9 +642,7 @@ def deploy_instance(oci_config, vpn_config, user_id, oci_region):
         apply_job = _create_job(
             resource_manager_client,
             stack.id,
-            oci.resource_manager.models.CreateApplyJobOperationDetails(
-                execution_plan_strategy="AUTO_APPROVED"
-            ),
+            "APPLY",
             f"Apply {stack.display_name}",
         )
         apply_result = _wait_for_job(resource_manager_client, apply_job.id, JOB_TIMEOUT_SECONDS)
