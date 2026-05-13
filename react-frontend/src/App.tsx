@@ -6,8 +6,6 @@ import VPNSuccess from "./pages/VPNSuccess";
 import About from "./pages/About";
 import CreateUser from "./pages/CreateUser";
 import CreateUserSuccess from "./pages/CreateUserSuccess";
-import TerraformSuccess from "./pages/TerraformSuccess";
-import CleanSuccess from "./pages/CleanSuccess";
 import StreamTrackerPrivacyPolicy from "./pages/StreamTrackerPrivacyPolicy";
 
 const App: React.FC = () => {
@@ -21,8 +19,6 @@ const App: React.FC = () => {
         <Route path="/about" element={<About />} />
         <Route path="/createUser" element={<CreateUser />} />
         <Route path="/createUserSuccess" element={<CreateUserSuccess />} />
-        <Route path="/terraformSuccess" element={<TerraformSuccess />} />
-        <Route path="/cleanSuccess" element={<CleanSuccess />} />
         
         <Route path="/StreamTrackerPrivacyPolicy" element={<StreamTrackerPrivacyPolicy />} />
       </Routes>

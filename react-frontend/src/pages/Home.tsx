@@ -3,19 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
-import { ACTION, Targets, TERRAFORM_ENUM, terraformHelper, VPNdeployHelper } from "../helpers/APIHelper";
+import { ACTION, Targets, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, onAuthStateChanged } from "../firebase";
-import { aws_regions, getLiveRegions, getRegionName, Region } from "../helpers/regionsHelper";
+import { getRegionName } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
-import { SOURCE_REGION } from "../Secrets/source_region";
 
 import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { generateConfig } from "../helpers/configHelper";
 import { fetchKeys, useKeyStore } from "../stores/keyStore";
-import { fetchAWSRegions, useAWSRegionsStore } from "../stores/awsRegionsStore";
-// import { useLiveRegionsStore } from "../stores/liveRegionsStore";
+import { fetchOciRegions, useOciRegionsStore } from "../stores/ociRegionsStore";
 
 export enum TOGGLE {
     ADD,
@@ -31,16 +29,11 @@ const Home: React.FC = () => {
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
-    const { AWSRegions } = useAWSRegionsStore();
-
-    // const { liveRegions, fetchLiveRegions } = useLiveRegionsStore();
-    const [liveRegions, setLiveRegions] = useState<Region[] | null>(); // Don't cache it anymore because it needs to update when things change
+    const { ociRegions } = useOciRegionsStore();
 
     const [region, setRegion] = useState("");
-    const [terraformRegion, setTerraformRegion] = useState("");
-    const [cleanRegion, setCleanRegion] = useState("");
 
-    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);
+    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[] | null>(null);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
     const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
@@ -67,93 +60,17 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { isNew, public_ipv4, client_private_key, server_public_key } = response.data;
+                const { isNew, public_ipv4, client_private_key, server_public_key, region_name } = response.data;
 
                 navigate("/VPNSuccess", {
                     replace: true,
-                    state: { region: getRegionName(region), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+                    state: { region: region_name || getRegionName(region, ociRegions), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
                 });
             }
 
         } catch (error) {
             setErrorMessage("Error during deployment");
             console.error("Error during deployment:", error);
-        }
-    };
-
-    const handleTerraformSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        
-        try {
-            if (!jwtToken) {
-                setErrorMessage("Error: JWT token not found");
-                console.error("Error: JWT token not found");
-            }
-            else {
-                const response = await terraformHelper(terraformRegion, jwtToken, TERRAFORM_ENUM.TERRAFORM);
-            
-                setLoading(false);
-
-                if (!response.success) {
-                    setErrorMessage(response.error || "Something went wrong");
-                    return;
-                }
-
-                // const { target_region, region_cleaned } = response.data;
-                const { target_region } = response.data;
-
-                if (!target_region) {
-                    setErrorMessage(`Terraform of target region ${terraformRegion} failed`);
-                }
-
-                navigate("/terraformSuccess", {
-                    replace: true,
-                    state: { region: getRegionName(target_region) }
-                });
-            }
-
-        } catch (error) {
-            setErrorMessage("Error during terraform");
-            console.error("Error during terraform:", error);
-        }
-    };
-
-    const handleTerraformClean = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        
-        try {
-            if (!jwtToken) {
-                setErrorMessage("Error: JWT token not found");
-                console.error("Error: JWT token not found");
-            }
-            else {
-                const response = await terraformHelper(cleanRegion, jwtToken, TERRAFORM_ENUM.CLEAN);
-            
-                setLoading(false);
-
-                if (!response.success) {
-                    setErrorMessage(response.error || "Something went wrong");
-                    return;
-                }
-
-                // const { target_region, region_cleaned } = response.data;
-                const { region_cleaned } = response.data;
-
-                if (!region_cleaned) {
-                    setErrorMessage(`Cleaning region ${cleanRegion} failed`);
-                }
-
-                navigate("/cleanSuccess", {
-                    replace: true,
-                    state: { region: getRegionName(region_cleaned) }
-                });
-            }
-
-        } catch (error) {
-            setErrorMessage("Error during clean");
-            console.error("Error during clean:", error);
         }
     };
 
@@ -276,11 +193,18 @@ const Home: React.FC = () => {
     }
 
     const fillVPNs = useCallback(async (user: User) => {
-        const VPNs: VPNData[] = await getUsersVPNs(user);
-        setVPNTableEntries(VPNs.map((vpn) => ({
-            ...vpn,
-            onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
-        })))
+        setVPNTableEntries(null);
+        try {
+            const VPNs: VPNData[] = await getUsersVPNs(user);
+            setVPNTableEntries(VPNs.map((vpn) => ({
+                ...vpn,
+                onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
+            })))
+        } catch (error) {
+            setErrorMessage("Error loading VPN instances");
+            console.error("Error loading VPN instances:", error);
+            setVPNTableEntries([]);
+        }
     }, [handleQRcode]);
 
     const handleDownload = () => {
@@ -304,53 +228,28 @@ const Home: React.FC = () => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             const fetchUserData = async () => {
                 if (user) {
-                    fillVPNs(user); // Not awaiting
+                    void fillVPNs(user); // Not awaiting
                     const token: string | null = await user.getIdToken();
                     setJwtToken(token);
                     
                     setRole(await getUserRole(user));
                     
-                    fetchKeys(requestedKeys, token); // Not awaiting         
-                    fetchAWSRegions(token); // Not awaiting         
-
-                    if (!liveRegions) {
-                        const result = await getLiveRegions();
-                        if (result) {
-                            setLiveRegions(result);
-                        }
-                    }
+                    void fetchKeys(requestedKeys, token); // Not awaiting         
+                    void fetchOciRegions(token); // Not awaiting
                 } else {
                     await logout(navigate);
                 }
             };
-            fetchUserData();
+            void fetchUserData();
         });
         return () => unsubscribe();
-    }, [navigate, fillVPNs, requestedKeys, liveRegions]);
+    }, [navigate, fillVPNs, requestedKeys]);
 
     useEffect(() => {
-        if (!AWSRegions?.length) return;
-
-        setLiveRegions((liveRegions) => {
-            if (!liveRegions?.length) return null;
-            let changed: boolean = false;
-            const updated: Region[] = liveRegions.map(region => {
-                const invalid = !AWSRegions.some(y => y.value === region.value);
-                if (region.invalid !== invalid) {
-                    changed = true;
-                    const newRegion: Region = {
-                        ...region,
-                        invalid: invalid
-                    };
-                    return newRegion;
-                }
-                return region;
-            });
-
-            // Return updated regions if any were changed
-            return changed ? updated : liveRegions;
-        });
-    }, [AWSRegions]);
+        if (!region && ociRegions?.length) {
+            setRegion(ociRegions[0].value);
+        }
+    }, [ociRegions, region]);
 
     return (
         // <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -404,23 +303,12 @@ const Home: React.FC = () => {
                 <h2 className="text-2xl font-semibold text-center mb-6">Deploy VPN Instance</h2>
 
                 <form onSubmit={async (e) => { await handleDeploySubmit(e); }}>
-                {/* AWS Region Dropdown */}
+                {/* Region Display */}
                 <div className="mb-6">
-                    <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
-                    <select
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                    >
-                    <option value="">Select a region</option>
-                    {liveRegions && liveRegions.length > 0 &&
-                    liveRegions.map((region) => (
-                        <option key={region.value} value={region.value}>
-                        {region.name}{region.invalid ? ' - ⚠️ Unsupported' : ''}
-                        </option>
-                    ))}
-                    </select>
+                    <p className="block text-gray-700 font-medium mb-2">OCI Region</p>
+                    <div className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800">
+                        {getRegionName(region, ociRegions) || "Loading region"}
+                    </div>
                     {role && role !== "admin" &&
                         <div className="ps-2 mt-2 text-xs">
                             <a
@@ -446,101 +334,16 @@ const Home: React.FC = () => {
                 </button>
                 </form>
             </div>
-
-            { /* ADMIN ONLY */ }
-            {role && role === "admin" &&
-            <>
-                <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
-                    <h2 className="text-2xl font-semibold text-center mb-6">Terraform New Region</h2>
-
-                    <form onSubmit={async (e) => { await handleTerraformSubmit(e); }}>
-                        {/* AWS Region Dropdown */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
-                            <select
-                            value={terraformRegion}
-                            onChange={(e) => setTerraformRegion(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            required
-                            >
-                            <option value="">Select a region</option>
-                            {!!liveRegions?.length && (
-                                AWSRegions?.length ? AWSRegions: aws_regions)
-                                    .filter((region) => !region.invalid && !liveRegions.map((r) => r.value)
-                                    .includes(region.value))
-                                    .map((region) => (
-                                        <option key={region.value} value={region.value}>
-                                            {region.name}
-                                        </option>
-                                    )
-                                )
-                            }
-                            </select>
-                        </div>
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={!terraformRegion}
-                            className={`w-full p-3 rounded-lg transition ${
-                                terraformRegion 
-                                ? "cursor-pointer bg-green-600 text-white hover:bg-green-700"
-                                : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                            }`}
-                        >
-                            Terraform Region
-                        </button>
-                    </form>
-                </div>
-                <div className="bg-white mt-8 p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-md">
-                    <h2 className="text-2xl font-semibold text-center mb-6">Clean Region</h2>
-                    <form onSubmit={async (e) => { await handleTerraformClean(e); }}>
-                        {/* AWS Region Dropdown */}
-                        <div className="mb-6">
-                            <label className="block text-gray-700 font-medium mb-2">Select AWS Region</label>
-                            <select
-                            value={cleanRegion}
-                            onChange={(e) => setCleanRegion(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            required
-                            >
-                            <option value="">Select a region</option>
-                            {liveRegions && liveRegions.length > 0 &&
-                            liveRegions.filter((region) => region.value !== SOURCE_REGION)
-                                .map((region) => (
-                                    <option key={region.value} value={region.value}>
-                                        {region.name}{region.invalid ? ' - ⚠️ Unsupported' : ''}
-                                    </option>
-                                ))
-                            }
-                            </select>
-                        </div>
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={!cleanRegion}
-                            className={`w-full p-3 rounded-lg transition ${
-                                cleanRegion 
-                                ? "cursor-pointer bg-red-600 text-white hover:bg-red-700"
-                                : "bg-gray-400 text-gray-200 cursor-not-allowed"
-                            }`}
-                        >
-                            Clean Region
-                        </button>
-                    </form>
-                </div>
-            </>
-            }
             
-            {VPNTableEntries.length > 0 &&
-                <VPNTable
-                    data={VPNTableEntries}
-                    isAdmin={role === "admin"}
-                    targets={targets}
-                    toggleTarget={toggleTarget}
-                    actionFunc={handleTerminate}
-                    onQRCodeClick={handleQRcode}
-                />
-            }
+            <VPNTable
+                data={VPNTableEntries}
+                isAdmin={role === "admin"}
+                regions={ociRegions}
+                targets={targets}
+                toggleTarget={toggleTarget}
+                actionFunc={handleTerminate}
+                onQRCodeClick={handleQRcode}
+            />
 
             {/* QR code overlay with download button */}
             {configData && (
@@ -556,7 +359,7 @@ const Home: React.FC = () => {
 
                         {vpnRegion && (
                             <p className="pt-1 text-gray-700">
-                                Region: <b>{vpnRegion}</b>
+                                Region: <b>{getRegionName(vpnRegion, ociRegions)}</b>
                             </p>
                         )}
 

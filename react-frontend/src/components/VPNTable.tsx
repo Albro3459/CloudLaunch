@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { QrCode } from "lucide-react";
 import { Targets } from "../helpers/APIHelper";
 import { TOGGLE } from "../pages/Home";
-import { getRegionName } from "../helpers/regionsHelper";
+import { getRegionName, Region } from "../helpers/regionsHelper";
 
 export type VPNTableEntry = {
     userID: string;
@@ -14,8 +14,9 @@ export type VPNTableEntry = {
 };
 
 type VPNTableData = {
-    data: VPNTableEntry[];
+    data: VPNTableEntry[] | null;
     isAdmin: boolean;
+    regions: Region[] | null;
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
     actionFunc: (targets: Targets) => void;
@@ -26,7 +27,24 @@ const capitalized = (str: string) => {
     return str[0].toUpperCase() + str.slice(1).toLowerCase();
 };
 
-const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean) => {
+const getStatusBadgeClasses = (status: string) => {
+    switch (status.toLowerCase()) {
+        case "running":
+            return "bg-green-100 text-green-800 border-green-200";
+        case "pending":
+            return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        case "failed":
+            return "bg-red-100 text-red-800 border-red-200";
+        case "terminated":
+            return "bg-red-950 text-red-50 border-red-950";
+        default:
+            return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+};
+
+const canShowConfig = (status: string) => status.toLowerCase() === "running";
+
+const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean, regions: Region[] | null) => {
     return [...data].sort((a, b) => {
         if (!sortField) return 0;
         
@@ -34,8 +52,8 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
         let bVal = b[sortField as keyof VPNTableEntry];
 
         if (sortField === "region") {
-            aVal = getRegionName(aVal);
-            bVal = getRegionName(bVal);
+            aVal = getRegionName(aVal, regions);
+            bVal = getRegionName(bVal, regions);
         } else {
             aVal = aVal || "";
             bVal = bVal || "";
@@ -47,9 +65,56 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
     });
 };
 
-export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
+type VPNTableRowData = {
+    entry: VPNTableEntry;
+    isAdmin: boolean;
+    regions: Region[] | null;
+    targets: Targets;
+    toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
+    onQRCodeClick: (ipv4: string, region: string | null) => void;
+};
+
+const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targets, toggleTarget, onQRCodeClick }) => {
+    const configAvailable = canShowConfig(entry.status);
+
+    return (
+        <tr className="border-b border-gray-100 hover:bg-gray-50">
+            {isAdmin &&
+                <>
+                    <td className="px-4 py-4 flex justify-center items-center">
+                    <input
+                        type="checkbox"
+                        checked={targets?.[entry.userID]?.[entry.region || ""]?.includes(entry.instanceID) || false}
+                        onChange={(e) => toggleTarget(e.target.checked ? TOGGLE.ADD : TOGGLE.REMOVE, entry.userID, entry.region, entry.instanceID) }
+                    />
+                    </td>
+                    <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
+                </>
+            }
+            <td className="px-4 py-2 text-center">{getRegionName(entry.region, regions) || "Null"}</td>
+            <td className="px-4 py-2 text-center">{entry.ipv4}</td>
+            <td className="px-4 py-2 text-center">
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(entry.status)}`}>
+                    {capitalized(entry.status)}
+                </span>
+            </td>
+            <td className="px-4 py-2 flex justify-center">
+                <button
+                    onClick={() => configAvailable && onQRCodeClick(entry.ipv4, entry.region)}
+                    disabled={!configAvailable}
+                    className={configAvailable ? "text-blue-600 hover:text-blue-800" : "text-gray-300 cursor-not-allowed"}
+                >
+                    <QrCode size={20} />
+                </button>
+            </td>
+        </tr>
+    );
+};
+
+export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, regions, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
 
     const [showConfirm, setShowConfirm] = useState(false);
+    const colSpan = isAdmin ? 6 : 4;
 
     const [sortField, setSortField] = useState<string | null>("region");
     const [sortAsc, setSortAsc] = useState(true);
@@ -137,33 +202,37 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.length > 0 && sortedData(data, sortField, sortAsc).map((entry, index) => (
-                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                                {isAdmin &&
+                        {data === null && (
+                            <tr className="border-b border-gray-100">
+                                {isAdmin && (
                                     <>
-                                        <td className="px-4 py-4 flex justify-center items-center">
-                                        <input 
-                                            type="checkbox"
-                                            checked={targets?.[entry.userID]?.[entry.region || ""]?.includes(entry.instanceID) || false}
-                                            onChange={(e) => toggleTarget(e.target.checked ? TOGGLE.ADD : TOGGLE.REMOVE, entry.userID, entry.region, entry.instanceID) }
-                                        />
-                                        </td>
-                                        <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
+                                        <td className="px-4 py-4"><div className="h-4 w-4 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                        <td className="px-4 py-4"><div className="h-4 w-32 rounded bg-gray-200 animate-pulse mx-auto" /></td>
                                     </>
-                                }
-                                <td className="px-4 py-2 text-center">{getRegionName(entry.region) || "Null"}</td>
-                                <td className="px-4 py-2 text-center">{entry.ipv4}</td>
-                                <td className="px-4 py-2 text-center">{capitalized(entry.status)}</td>
-                                <td className="px-4 py-2 flex justify-center">
-                                    <button
-                                        onClick={() => onQRCodeClick(entry.ipv4, entry.region)}
-                                        // disabled={keyStore.loading || !keyStore.keys}
-                                        className="text-blue-600 hover:text-blue-800"
-                                    >
-                                        <QrCode size={20} />
-                                    </button>
+                                )}
+                                <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-5 w-5 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                            </tr>
+                        )}
+                        {data?.length === 0 && (
+                            <tr>
+                                <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
+                                    {isAdmin ? "No active VPN instances." : "No VPN instances yet."}
                                 </td>
                             </tr>
+                        )}
+                        {data && data.length > 0 && sortedData(data, sortField, sortAsc, regions).map((entry) => (
+                            <VPNTableRow
+                                key={entry.instanceID}
+                                entry={entry}
+                                isAdmin={isAdmin}
+                                regions={regions}
+                                targets={targets}
+                                toggleTarget={toggleTarget}
+                                onQRCodeClick={onQRCodeClick}
+                            />
                         ))}
                     </tbody>
                 </table>

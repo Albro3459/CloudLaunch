@@ -70,7 +70,7 @@ const About: React.FC = () => {
                     </a>
                 </div>
                 <p className="text-gray-700 mb-4">
-                    Instantly deploy a secure <b>WireGuard VPN</b> on an AWS EC2 instance in the region of your choice, 
+                    Instantly deploy a secure <b>WireGuard VPN</b> on an <b>AWS EC2</b> instance in the region of your choice, 
                     pre-configured with IPv4, IPv6, and DNS.
                 </p>
                 <p className="text-gray-700 mb-4">
@@ -78,7 +78,7 @@ const About: React.FC = () => {
                     and hassle-free setup.
                 </p>
                 <p className="text-gray-700 mb-4">
-                    Generate your VPN configuration instantly, scan a QR code, or download the <b>.conf</b> file for easy setup on 
+                    Generate your VPN configuration instantly, scan a QR code, or download the .conf file for easy setup on 
                     your devices. All in just a few clicks.
                 </p>
                 <p className="text-gray-700">
