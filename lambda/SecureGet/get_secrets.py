@@ -16,6 +16,10 @@ class VpnSecretKey(StrEnum):
     CLIENT_PRIVATE_KEY = "WG_CLIENT_PRIVATE_KEY"
     SERVER_PUBLIC_KEY = "WG_SERVER_PUBLIC_KEY"
 
+class OciSecretKey(StrEnum):
+    REGION = "OCI_REGION"
+    REGION_NAME = "OCI_REGION_NAME"
+
 # Get secrets from AWS
 def get_secret(secret_name, region_name):
     session = boto3.session.Session()

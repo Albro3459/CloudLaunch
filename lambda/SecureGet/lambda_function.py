@@ -2,6 +2,7 @@ import json
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import (
+    OciSecretKey,
     SecretSection,
     VpnSecretKey,
     get_cloudlaunch_secret,
@@ -47,6 +48,7 @@ def lambda_handler(event, context):
         }
     try:
         firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
+        oci_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
         vpn_config = get_secret_section(cloudlaunch_secret, SecretSection.VPN)
     except ValueError as e:
         return {
@@ -71,6 +73,10 @@ def lambda_handler(event, context):
             result[key] = get_secret_value(vpn_config, VpnSecretKey.CLIENT_PRIVATE_KEY)
         elif key == "server_public_key":
             result[key] = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
+        elif key == "oci_region":
+            result[key] = get_secret_value(oci_config, OciSecretKey.REGION)
+        elif key == "oci_region_name":
+            result[key] = get_secret_value(oci_config, OciSecretKey.REGION_NAME)
         else:
             result[key] = None # Explicitly show unknown keys
 
