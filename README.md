@@ -5,15 +5,13 @@
    <img src="https://github.com/user-attachments/assets/2665ae69-5ab6-4d1d-ab18-f1cd32935ae8" alt="Deploy" height="400"/>
 </div>
 
-# TODO update the readme for oracle
-
 ## About:
 
  * Live at: [cloudlaunch.live/](https://www.cloudlaunch.live/)
 
- * Instantly deploy a secure <b>WireGuard VPN</b> on an AWS EC2 instance in the region of your choice, pre-configured with IPv4, IPv6, and DNS.
+ * Instantly deploy a secure <b>WireGuard VPN</b>, pre-configured with IPv4, IPv6, and DNS.
 
- * The entire deployment process is automated using <b>AWS Lambda</b>, ensuring a fast, efficient, and hassle-free setup.
+ * The deployment flow is being migrated from AWS EC2/AMI provisioning to Oracle Cloud Infrastructure stacks managed by <b>AWS Lambda</b>.
 
  * Generate your VPN configuration instantly, scan a QR code, or download the <b>.conf</b> file for easy setup on your devices. All in just a few clicks.
 
@@ -23,9 +21,9 @@
 * React with TypeScript and TailwindCSS for the Frontend
 * Python for the AWS Lambda scripts
 * Firebase for Authentication and Database
-* AWS tools used:
-  * EC2 (+ AMI), Lambda, SES, DynamoDB, Secrets Manager, VPC (+ Subnet), IAM, CloudWatch, and the AWS CLI
-* EC2 instance configured with Wireguard, then saved as an AMI image that can be automatically deployed to any region from the frontend with Lambda scripts.
+* Cloud tools used:
+  * AWS Lambda, SES, DynamoDB, Secrets Manager, IAM, CloudWatch
+  * OCI Resource Manager, Compute, Virtual Networking, and Terraform stacks
 * If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: [brodsky.alex22@gmail.com](brodsky.alex22@gmail.com)
 
 ## Usage

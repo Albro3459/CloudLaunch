@@ -1,18 +1,5 @@
 # TODO
 
-* create a separate aws secret named `OCI-Auth` for OCI SDK auth:
-{
-  "OCI_USER_OCID": "...",
-  "OCI_TENANCY_OCID": "...",
-  "OCI_FINGERPRINT": "...",
-  "OCI_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-}
-
-* notes for `OCI-Auth`:
-  * keep this separate from the vpn config secret.
-  * the lambda code should read this secret and use it for `oci.resource_manager`, `oci.core.compute`, and `oci.core.virtual_network` clients.
-  * keep `OCI-Auth` limited to only the OCI SDK auth fields above.
-
 * add these secrets to aws in `VPN-Config` to build the terraform vars:
 {
   "OCI_REGION": "...",

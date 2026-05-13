@@ -15,8 +15,27 @@ Create these AWS Secrets Manager secrets:
   * Use the example at [VPN-Config.example](secrets/VPN-Config.example) as the template for the secret payload.
 
 * `OCI-Auth`
-  * Used by the deploy Lambda for OCI SDK authentication.
+  * Used by the deploy Lambda for OCI REST API request signing.
   * Use the example at [OCI-Auth.example](secrets/OCI-Auth.example) as the template for the secret payload.
+
+## OCI Deployment
+
+The `Deploy` Lambda manages Oracle Cloud Infrastructure over HTTPS with signed REST requests. It does not use the Python OCI SDK because the SDK is too large for an AWS Lambda layer, even when the layer zip is uploaded through S3.
+
+The Lambda needs outbound egress to public OCI API endpoints for Resource Manager, Compute, and Virtual Network calls. If the Lambda runs outside a VPC, normal Lambda internet egress should be enough. If it is attached to private VPC subnets, configure a NAT gateway or another approved outbound path.
+
+`OCI-Auth` contains only OCI request-signing values:
+
+```json
+{
+  "OCI_USER_OCID": "...",
+  "OCI_TENANCY_OCID": "...",
+  "OCI_FINGERPRINT": "...",
+  "OCI_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+}
+```
+
+In OCI, create or choose an automation user, add an API signing key, and grant only the policies needed to manage Resource Manager stacks/jobs, inspect or terminate compute instances, and read VNIC details. Keep Terraform/runtime values in `VPN-Config`, not `OCI-Auth`.
 
 ## Required Lambda Layer
 
@@ -28,9 +47,8 @@ This layer needs to include:
 * Google Cloud Firestore client
 * Requests
 * QR code dependencies
-* OCI SDK
 
-The build for that layer is defined in [Dockerfile](Dockerfile). Rebuild the layer after dependency changes and attach the updated layer version to the Lambda functions that import `firebase_admin` or `oci`.
+The build for that layer is defined in [Dockerfile](Dockerfile). Rebuild the layer after dependency changes and attach the updated layer version to the Lambda functions that import `firebase_admin`, `requests`, or `qrcode`.
 
 ## Layer Build
 
