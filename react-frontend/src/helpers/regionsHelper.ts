@@ -7,7 +7,7 @@ export type Region = {
     value: string;
 }
 
-export const getRegionName = (region: string | null): string => {
+export const getRegionName = (region: string | null, regions: Region[] | null = oci_regions): string => {
     if (!region) return '';
-    return oci_regions.find(r => r.value === region)?.name || region;
+    return (regions || oci_regions).find(r => r.value === region)?.name || region;
 };

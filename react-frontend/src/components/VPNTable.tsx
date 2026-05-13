@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { QrCode } from "lucide-react";
 import { Targets } from "../helpers/APIHelper";
 import { TOGGLE } from "../pages/Home";
-import { getRegionName } from "../helpers/regionsHelper";
+import { getRegionName, Region } from "../helpers/regionsHelper";
 
 export type VPNTableEntry = {
     userID: string;
@@ -16,6 +16,7 @@ export type VPNTableEntry = {
 type VPNTableData = {
     data: VPNTableEntry[] | null;
     isAdmin: boolean;
+    regions: Region[] | null;
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
     actionFunc: (targets: Targets) => void;
@@ -43,7 +44,7 @@ const getStatusBadgeClasses = (status: string) => {
 
 const canShowConfig = (status: string) => status.toLowerCase() === "running";
 
-const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean) => {
+const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean, regions: Region[] | null) => {
     return [...data].sort((a, b) => {
         if (!sortField) return 0;
         
@@ -51,8 +52,8 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
         let bVal = b[sortField as keyof VPNTableEntry];
 
         if (sortField === "region") {
-            aVal = getRegionName(aVal);
-            bVal = getRegionName(bVal);
+            aVal = getRegionName(aVal, regions);
+            bVal = getRegionName(bVal, regions);
         } else {
             aVal = aVal || "";
             bVal = bVal || "";
@@ -67,12 +68,13 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
 type VPNTableRowData = {
     entry: VPNTableEntry;
     isAdmin: boolean;
+    regions: Region[] | null;
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
     onQRCodeClick: (ipv4: string, region: string | null) => void;
 };
 
-const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, targets, toggleTarget, onQRCodeClick }) => {
+const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targets, toggleTarget, onQRCodeClick }) => {
     const configAvailable = canShowConfig(entry.status);
 
     return (
@@ -89,7 +91,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, targets, toggl
                     <td className="px-4 py-2 text-center">{entry.email || "Null"}</td>
                 </>
             }
-            <td className="px-4 py-2 text-center">{getRegionName(entry.region) || "Null"}</td>
+            <td className="px-4 py-2 text-center">{getRegionName(entry.region, regions) || "Null"}</td>
             <td className="px-4 py-2 text-center">{entry.ipv4}</td>
             <td className="px-4 py-2 text-center">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(entry.status)}`}>
@@ -109,7 +111,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, targets, toggl
     );
 };
 
-export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
+export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, regions, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
 
     const [showConfirm, setShowConfirm] = useState(false);
     const colSpan = isAdmin ? 6 : 4;
@@ -221,11 +223,12 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                                 </td>
                             </tr>
                         )}
-                        {data && data.length > 0 && sortedData(data, sortField, sortAsc).map((entry) => (
+                        {data && data.length > 0 && sortedData(data, sortField, sortAsc, regions).map((entry) => (
                             <VPNTableRow
                                 key={entry.instanceID}
                                 entry={entry}
                                 isAdmin={isAdmin}
+                                regions={regions}
                                 targets={targets}
                                 toggleTarget={toggleTarget}
                                 onQRCodeClick={onQRCodeClick}

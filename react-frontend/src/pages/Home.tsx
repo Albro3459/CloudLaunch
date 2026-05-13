@@ -64,7 +64,7 @@ const Home: React.FC = () => {
 
                 navigate("/VPNSuccess", {
                     replace: true,
-                    state: { region: region_name || getRegionName(region), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+                    state: { region: region_name || getRegionName(region, ociRegions), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
                 });
             }
 
@@ -307,7 +307,7 @@ const Home: React.FC = () => {
                 <div className="mb-6">
                     <p className="block text-gray-700 font-medium mb-2">OCI Region</p>
                     <div className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800">
-                        {getRegionName(region) || "Loading region"}
+                        {getRegionName(region, ociRegions) || "Loading region"}
                     </div>
                     {role && role !== "admin" &&
                         <div className="ps-2 mt-2 text-xs">
@@ -338,6 +338,7 @@ const Home: React.FC = () => {
             <VPNTable
                 data={VPNTableEntries}
                 isAdmin={role === "admin"}
+                regions={ociRegions}
                 targets={targets}
                 toggleTarget={toggleTarget}
                 actionFunc={handleTerminate}
@@ -358,7 +359,7 @@ const Home: React.FC = () => {
 
                         {vpnRegion && (
                             <p className="pt-1 text-gray-700">
-                                Region: <b>{getRegionName(vpnRegion)}</b>
+                                Region: <b>{getRegionName(vpnRegion, ociRegions)}</b>
                             </p>
                         )}
 
