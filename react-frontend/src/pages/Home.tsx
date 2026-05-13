@@ -33,7 +33,7 @@ const Home: React.FC = () => {
 
     const [region, setRegion] = useState("");
 
-    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[]>([]);
+    const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[] | null>(null);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
     const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
@@ -193,11 +193,18 @@ const Home: React.FC = () => {
     }
 
     const fillVPNs = useCallback(async (user: User) => {
-        const VPNs: VPNData[] = await getUsersVPNs(user);
-        setVPNTableEntries(VPNs.map((vpn) => ({
-            ...vpn,
-            onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
-        })))
+        setVPNTableEntries(null);
+        try {
+            const VPNs: VPNData[] = await getUsersVPNs(user);
+            setVPNTableEntries(VPNs.map((vpn) => ({
+                ...vpn,
+                onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
+            })))
+        } catch (error) {
+            setErrorMessage("Error loading VPN instances");
+            console.error("Error loading VPN instances:", error);
+            setVPNTableEntries([]);
+        }
     }, [handleQRcode]);
 
     const handleDownload = () => {
@@ -328,16 +335,14 @@ const Home: React.FC = () => {
                 </form>
             </div>
             
-            {VPNTableEntries.length > 0 &&
-                <VPNTable
-                    data={VPNTableEntries}
-                    isAdmin={role === "admin"}
-                    targets={targets}
-                    toggleTarget={toggleTarget}
-                    actionFunc={handleTerminate}
-                    onQRCodeClick={handleQRcode}
-                />
-            }
+            <VPNTable
+                data={VPNTableEntries}
+                isAdmin={role === "admin"}
+                targets={targets}
+                toggleTarget={toggleTarget}
+                actionFunc={handleTerminate}
+                onQRCodeClick={handleQRcode}
+            />
 
             {/* QR code overlay with download button */}
             {configData && (

@@ -14,7 +14,7 @@ export type VPNTableEntry = {
 };
 
 type VPNTableData = {
-    data: VPNTableEntry[];
+    data: VPNTableEntry[] | null;
     isAdmin: boolean;
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
@@ -50,6 +50,7 @@ const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: bo
 export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggleTarget, actionFunc, onQRCodeClick }) => {
 
     const [showConfirm, setShowConfirm] = useState(false);
+    const colSpan = isAdmin ? 6 : 4;
 
     const [sortField, setSortField] = useState<string | null>("region");
     const [sortAsc, setSortAsc] = useState(true);
@@ -137,7 +138,28 @@ export const VPNTable: React.FC<VPNTableData> = ({ data, isAdmin, targets, toggl
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.length > 0 && sortedData(data, sortField, sortAsc).map((entry, index) => (
+                        {data === null && (
+                            <tr className="border-b border-gray-100">
+                                {isAdmin && (
+                                    <>
+                                        <td className="px-4 py-4"><div className="h-4 w-4 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                        <td className="px-4 py-4"><div className="h-4 w-32 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                    </>
+                                )}
+                                <td className="px-4 py-4"><div className="h-4 w-24 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-4 w-28 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-4 w-20 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                                <td className="px-4 py-4"><div className="h-5 w-5 rounded bg-gray-200 animate-pulse mx-auto" /></td>
+                            </tr>
+                        )}
+                        {data?.length === 0 && (
+                            <tr>
+                                <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
+                                    {isAdmin ? "No active VPN instances." : "No VPN instances yet."}
+                                </td>
+                            </tr>
+                        )}
+                        {data && data.length > 0 && sortedData(data, sortField, sortAsc).map((entry, index) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                                 {isAdmin &&
                                     <>
