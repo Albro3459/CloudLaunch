@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, signInWithEmailAndPassword } from "../firebase";
 import { validatePassword } from "../helpers/passwordHelper";
 
 const PasswordReset: React.FC = () => {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const mode = searchParams.get("mode");
     const oobCode = searchParams.get("oobCode");
@@ -62,9 +63,8 @@ const PasswordReset: React.FC = () => {
             }
 
             await confirmPasswordReset(auth, oobCode, password);
-            setPassword("");
-            setConfirmPassword("");
-            setSuccessMessage("Password reset successfully. You can now log in.");
+            await signInWithEmailAndPassword(auth, email, password);
+            navigate("/home", { replace: true });
         } catch (error) {
             setErrorMessage("Error: Unable to reset password. Please request a new reset link.");
         } finally {
@@ -105,16 +105,6 @@ const PasswordReset: React.FC = () => {
                 {loading ? (
                     <div className="flex justify-center py-6">
                         <div className="border-t-4 border-blue-600 border-solid rounded-full w-12 h-12 animate-spin"></div>
-                    </div>
-                ) : successMessage ? (
-                    <div className="text-center">
-                        <p className="text-gray-700 mb-6">Your password has been updated.</p>
-                        <a
-                            href="/#/login"
-                            className="inline-block w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
-                        >
-                            Back to Login
-                        </a>
                     </div>
                 ) : (
                     <form onSubmit={handleResetPassword}>

@@ -47,7 +47,7 @@ export const useOciRegionsStore = create<OciRegionsStore>((set) => ({
 
       set({ ociRegions: regions, loading: false });
     } else {
-      set({ error: result?.error || 'OCI regions fetch failed', loading: false });
+      set({ error: result?.error || 'Regions fetch failed', loading: false });
     }
   },
 

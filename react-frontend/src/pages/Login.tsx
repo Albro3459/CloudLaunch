@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth, onAuthStateChanged, signInWithEmailAndPassword } from "../firebase";
+import { auth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword } from "../firebase";
+import packageJson from "../../package.json";
 
 const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -8,6 +9,7 @@ const Login: React.FC = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>();
+    const [success, setSuccess] = useState<string | null>();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,6 +27,29 @@ const Login: React.FC = () => {
             navigate("/home", { replace: true });
         } catch (err) {
             setError("Invalid email or password.");
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        setError(null);
+        setSuccess(null);
+
+        const trimmedEmail = email.trim();
+        if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+            setError("Enter your email first.");
+            return;
+        }
+
+        const confirmed = window.confirm(`Send a password reset email to ${trimmedEmail}?`);
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await sendPasswordResetEmail(auth, trimmedEmail);
+            setSuccess("Password reset email sent.");
+        } catch (err) {
+            setError("Unable to send password reset email.");
         }
     };
 
@@ -55,18 +80,19 @@ const Login: React.FC = () => {
 
         {/* {error && <p>{error}</p>} */}
         {/* Error or Success */}
-        {(error) && (
+        {(error || success) && (
             <div className="fixed top-20 w-full flex justify-center z-50">
             <div className={`px-6 py-3 rounded-xl shadow-md w-full max-w-md flex justify-between items-center ${
                 error ? "bg-red-500 text-white" : "bg-green-500 text-white"
             }`}>
                 <span className="text-sm">
-                {error}
+                {error || success}
                 </span>
                 <button
                 className="ml-4 font-bold hover:text-gray-200 transition"
                 onClick={() => {
                     setError(null);
+                    setSuccess(null);
                 }}
                 >
                 ✕
@@ -116,6 +142,14 @@ const Login: React.FC = () => {
                 </button>
 
                 <div className="ps-2 mt-2 text-xs">
+                    <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    className="cursor-pointer text-blue-600 underline hover:text-blue-800"
+                    >
+                    Reset password
+                    </button>
+                    <span> | </span>
                     <a
                     href="mailto:Brodsky.Alex22@gmail.com"
                     className="text-blue-600 underline hover:text-blue-800"
@@ -125,6 +159,9 @@ const Login: React.FC = () => {
                 </div>
             </form>
         </div>
+        <span className="fixed bottom-2 right-3 text-xs text-gray-400">
+            v{packageJson?.version || '0.0.0'}
+        </span>
         </div>
     );
 };

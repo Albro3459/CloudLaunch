@@ -305,7 +305,7 @@ const Home: React.FC = () => {
                 <form onSubmit={async (e) => { await handleDeploySubmit(e); }}>
                 {/* Region Display */}
                 <div className="mb-6">
-                    <p className="block text-gray-700 font-medium mb-2">OCI Region</p>
+                    <p className="block text-gray-700 font-medium mb-2">Region</p>
                     <div className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800">
                         {getRegionName(region, ociRegions) || "Loading region"}
                     </div>

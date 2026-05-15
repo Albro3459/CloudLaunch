@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { auth, onAuthStateChanged } from "../firebase";
 import { logout } from "../helpers/firebaseDbHelper";
+import packageJson from "../../package.json";
 
 const About: React.FC = () => {
     const navigate = useNavigate();
@@ -85,6 +86,9 @@ const About: React.FC = () => {
                     <b>Secure, simple, and instant.</b> Your personal cloud VPN, deployed on demand.
                 </p>
             </div>
+            <span className="fixed bottom-2 right-3 text-xs text-gray-400">
+                v{packageJson?.version || '0.0.0'}
+            </span>
         </div>
     );    
 };
