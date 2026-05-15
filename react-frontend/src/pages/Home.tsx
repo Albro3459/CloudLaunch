@@ -37,7 +37,6 @@ const Home: React.FC = () => {
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
     const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
-    const { keys } = useKeyStore();
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -163,16 +162,14 @@ const Home: React.FC = () => {
         setIP(IPv4); 
         setVpnRegion(region);
 
-        let clientKey, serverKey;
-        if (!keys) {
+        let store = useKeyStore.getState();
+        if (!store.keys) {
             await fetchKeys(requestedKeys, await auth.currentUser?.getIdToken() ?? ""); // If fetching, it can wait on the original fetch and get updated! WOOO
-            const store = useKeyStore.getState();
-            clientKey = store.keys?.client_private_key || null;
-            serverKey = store.keys?.server_public_key || null;
-        } else {
-            clientKey = keys.client_private_key || null;
-            serverKey = keys.server_public_key || null;
+            store = useKeyStore.getState();
         }
+
+        const clientKey = store.keys?.client_private_key || null;
+        const serverKey = store.keys?.server_public_key || null;
 
         if (!clientKey || !serverKey) {
             setErrorMessage("Failed to retrieve keys for QR code.");
@@ -183,7 +180,7 @@ const Home: React.FC = () => {
         }
 
         setLoading(false);
-    }, [keys, requestedKeys]);
+    }, [requestedKeys]);
     
     
     const handleCreateNewAccount = () => {
