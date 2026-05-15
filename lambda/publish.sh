@@ -6,6 +6,8 @@ set -euo pipefail
 
 AWS_PROFILE_NAME="cloudlaunch"
 OUTPUT_ROOT="$HOME/Desktop/CloudLaunch-Publish"
+VERSION_FILE_NAME="version.py"
+BUMP_VERSION_SCRIPT="bump_version.py"
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 
@@ -56,6 +58,15 @@ if [ ! -d "$lambda_dir" ]; then
   exit 1
 fi
 
+bump_lambda_version() {
+  local version_file="$lambda_dir/$VERSION_FILE_NAME"
+  local new_version
+
+  new_version="$(python3 "$script_dir/$BUMP_VERSION_SCRIPT" "$version_file")"
+
+  echo "Lambda version: $new_version"
+}
+
 stage_root="$OUTPUT_ROOT/stage"
 package_root="$OUTPUT_ROOT/packages"
 
@@ -67,6 +78,8 @@ echo "Source folder: $lambda_dir"
 echo "Stage folder: $stage_dir"
 echo "Output zip: $output_path"
 echo "AWS profile: $AWS_PROFILE_NAME"
+
+bump_lambda_version
 
 if [ -e "$stage_dir" ]; then
   trash "$stage_dir"
