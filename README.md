@@ -7,7 +7,7 @@
 
 ## About:
 
- * Live at: [cloudlaunch.live/](https://www.cloudlaunch.live/)
+ * Live at: [gocloudlaunch.com/](https://www.gocloudlaunch.com/)
 
  * Instantly deploy a secure <b>WireGuard VPN</b>, pre-configured with IPv4, IPv6, and DNS.
 

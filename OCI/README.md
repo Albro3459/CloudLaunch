@@ -16,14 +16,13 @@ Create a dedicated OCI user for CloudLaunch automation.
 2. Create an automation user and add it to that group.
 3. Generate an API signing key pair for the user.
 4. Upload the public key to the user's API keys.
-5. Store these values in the `oci` object of the AWS `CloudLaunch` secret:
-   * `OCI_USER_OCID`
-   * `OCI_TENANCY_OCID`
-   * `OCI_FINGERPRINT`
-   * `OCI_PRIVATE_KEY`
-   * `OCI_REGION`
+5. Update the AWS `CloudLaunch` secrets
+  * See what is required in the `oci` object in [CloudLaunch.example](../lambda/secrets/CloudLaunch.example)
 
-Use an unencrypted PEM private key. The Lambda stores and signs from the Secrets Manager value directly; it does not read a local OCI config file.
+Use an unencrypted PEM private key. 
+
+**NOTE:**
+The Lambda stores and signs from the Secrets Manager value directly. It does not read a local OCI config file.
 
 ## OCI Policies
 

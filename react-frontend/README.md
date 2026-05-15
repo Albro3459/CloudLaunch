@@ -26,9 +26,6 @@ npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
     * Pro: Can be ran from any branch
     * Con: Must be run locally and it can be confusing
 
-Push changes to main or dev.
-
-Then:
 ```sh
 cd react-frontend; 
 npm run deploy # Deploys to gh-pages branch

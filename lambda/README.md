@@ -6,36 +6,9 @@ This folder contains the AWS Lambda functions that authenticate users, read the 
 
 Create one AWS Secrets Manager secret named `CloudLaunch`. Use [CloudLaunch.example](secrets/CloudLaunch.example) as the payload template.
 
-The secret has four top-level objects:
+The secret has four top-level objects: aws, firebase, oci, vpn
 
-```json
-{
-  "aws": {
-    "SES_SENDER": "CloudLaunch <noreply@example.com>",
-    "ADMIN_EMAIL": "admin@example.com"
-  },
-  "firebase": {
-    "type": "service_account"
-  },
-  "oci": {
-    "OCI_REGION": "us-sanjose-1",
-    "OCI_REGION_NAME": "San Jose",
-    "OCI_USER_OCID": "ocid1.user...",
-    "OCI_TENANCY_OCID": "ocid1.tenancy...",
-    "OCI_FINGERPRINT": "00:00:00:...",
-    "OCI_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
-    "OCI_COMPARTMENT_ID": "ocid1.compartment...",
-    "OCI_AVAILABILITY_DOMAIN": "...",
-    "OCI_SUBNET_ID": "ocid1.subnet...",
-    "OCI_SOURCE_IMAGE_ID": "ocid1.image..."
-  },
-  "vpn": {
-    "WG_INTERFACE": "wg0"
-  }
-}
-```
-
-Keep the complete Firebase service-account JSON in `firebase`, all OCI API signing and Terraform values in `oci`, and WireGuard runtime values in `vpn`.
+Keep AWS SES email and the Admin email in AWS  the complete Firebase service-account JSON in `firebase`, all OCI API signing and Terraform values in `oci`, and WireGuard runtime values in `vpn`.
 
 ## OCI Deployment Flow
 
@@ -104,19 +77,21 @@ The script builds the Docker image, copies `/layer/python` out of the container,
 
 Upload the resulting layer zip to AWS Lambda, publish a new layer version, and attach it to the Lambda functions.
 
-## Deploy Lambda Packaging Notes
+## Lambda Deployment
 
-Use [build_deploy_lambda.sh](Deploy/build_deploy_lambda.sh) as the supported workflow for packaging the `Deploy` Lambda.
+Use [publish.sh](publish.sh) as the supported workflow for publishing Lambda code updates.
 
-From the `lambda/Deploy/` directory, run:
+From the `lambda/` directory, run one of:
 
 ```sh
-zsh ./build_deploy_lambda.sh
+./publish.sh Deploy
+./publish.sh CreateUser
+./publish.sh SecureGet
 ```
 
-The script recreates `~/Desktop/Deploy`, copies the `Deploy` Lambda code into that folder, and adds `terraform/` with the required OCI files.
+The script bumps the selected Lambda's `version.py`, stages the function in `~/Desktop/CloudLaunch-Publish/stage`, writes the zip to `~/Desktop/CloudLaunch-Publish/packages`, and publishes it with `aws lambda update-function-code` using the `cloudlaunch` AWS profile.
 
-Zip `~/Desktop/Deploy` and upload that zip as the `Deploy` Lambda code package.
+For the `Deploy` Lambda, `publish.sh` runs [build_deploy_lambda.sh](Deploy/build_deploy_lambda.sh) during staging so the package includes the required `terraform/` files from [OCI/terraform](../OCI/terraform).
 
 ## Manual Test Plan
 

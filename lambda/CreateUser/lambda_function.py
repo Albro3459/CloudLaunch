@@ -5,6 +5,23 @@ from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import SecretSection, get_cloudlaunch_secret, get_secret_section
 
 AWS_REGION = "us-west-1"
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_MAX_LENGTH = 4096
+
+def validate_password(password):
+    if len(password) < PASSWORD_MIN_LENGTH:
+        return f"Password must be at least {PASSWORD_MIN_LENGTH} characters long"
+    if len(password) > PASSWORD_MAX_LENGTH:
+        return f"Password must be no more than {PASSWORD_MAX_LENGTH} characters long"
+    if not any(char.isupper() for char in password):
+        return "Password must include an uppercase character"
+    if not any(char.islower() for char in password):
+        return "Password must include a lowercase character"
+    if not any(char.isdigit() for char in password):
+        return "Password must include a numeric character"
+    if not any(not char.isalnum() for char in password):
+        return "Password must include a special character"
+    return None
 
 def create_auth_user(email, password):
     try:
@@ -46,7 +63,9 @@ def lambda_handler(event, context):
 
     # Extract required values
     email = body.get("email", "").strip()
-    password = body.get("password", "").strip()
+    password = body.get("password", "")
+    if not isinstance(password, str):
+        password = ""
 
     # Validate input
     if not email or not password or not token or \
@@ -55,6 +74,12 @@ def lambda_handler(event, context):
         return {
             "statusCode": 400,
             "body": json.dumps({"error": f"Missing required parameters"})
+        }
+    password_error = validate_password(password)
+    if password_error:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": password_error})
         }
 
     # Fetch secrets

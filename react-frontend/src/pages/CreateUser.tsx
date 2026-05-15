@@ -7,6 +7,31 @@ import { faHouse } from "@fortawesome/free-solid-svg-icons";
 import { createUser, getUserRole } from "../helpers/usersHelper";
 import { logout } from "../helpers/firebaseDbHelper";
 
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 4096;
+
+const validatePassword = (password: string): string | null => {
+    if (password.length < PASSWORD_MIN_LENGTH) {
+        return `Error: Password must be at least ${PASSWORD_MIN_LENGTH} characters long`;
+    }
+    if (password.length > PASSWORD_MAX_LENGTH) {
+        return `Error: Password must be no more than ${PASSWORD_MAX_LENGTH} characters long`;
+    }
+    if (!/[A-Z]/.test(password)) {
+        return "Error: Password must include an uppercase character";
+    }
+    if (!/[a-z]/.test(password)) {
+        return "Error: Password must include a lowercase character";
+    }
+    if (!/[0-9]/.test(password)) {
+        return "Error: Password must include a numeric character";
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+        return "Error: Password must include a special character";
+    }
+    return null;
+};
+
 const CreateUser: React.FC = () => {
     const navigate = useNavigate();
     const [jwtToken, setJwtToken] = useState<string | null>(null);
@@ -49,13 +74,13 @@ const CreateUser: React.FC = () => {
         setSuccessMessage(null);
 
         try {
-            password.trim();
-            if (password.length < 6) {
+            const trimmedEmail = email.trim();
+            const passwordError = validatePassword(password);
+            if (passwordError) {
                 setLoading(false);
-                setErrorMessage("Error: Password must be > 6 characters long");
+                setErrorMessage(passwordError);
                 return;
             }
-            confirmPassword.trim();
             if (password !== confirmPassword) {
                 setLoading(false);
                 setErrorMessage("Error: Passwords don't match");
@@ -68,20 +93,19 @@ const CreateUser: React.FC = () => {
                 return;
             }
             else {
-                email.trim();
-                if (!email.includes('@') || !email.includes('.')) {
+                if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
                     setLoading(false);
                     setErrorMessage("Error: Not a valid email.");
                     return;
                 }
-                const result = await createUser(email, password, jwtToken);
+                const result = await createUser(trimmedEmail, password, jwtToken);
                 setLoading(false);
                 if (result.success) {
-                    setSuccessMessage(`Created user: ${email}`);
+                    setSuccessMessage(`Created user: ${trimmedEmail}`);
                     setEmail(""); setPassword(""); setConfirmPassword("");
                     navigate("/CreateUserSuccess", {
                         replace: true,
-                        state: { email: email, password: password }
+                        state: { email: trimmedEmail, password: password }
                     });
                 }
                 else {
@@ -158,9 +182,12 @@ const CreateUser: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     required
                     />
+                    <p className="mt-2 text-xs text-gray-500">
+                    Must include uppercase, lowercase, number, and special character.
+                    </p>
                 </div>
                 {/* Confirm Password */}
                 <div className="mb-6">

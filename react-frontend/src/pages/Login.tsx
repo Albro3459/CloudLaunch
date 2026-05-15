@@ -16,6 +16,11 @@ const Login: React.FC = () => {
                 setError("Not a valid email.");
                 return;
             }
+            if (!password.trim().length) {
+                setError("Password is required.");
+                return;
+            }
+
             await signInWithEmailAndPassword(auth, email, password);
             navigate("/home", { replace: true });
         } catch (err) {
@@ -78,7 +83,10 @@ const Login: React.FC = () => {
                 <div className="mb-4">
                     <label className="block text-gray-700 font-medium mb-2">Email</label>
                     <input
-                        type="text"
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="username"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         placeholder="Enter your email"
                         value={email}
@@ -89,7 +97,10 @@ const Login: React.FC = () => {
                 <div className="mb-4">
                     <label className="block text-gray-700 font-medium mb-2">Password</label>
                     <input
+                        id="password"
+                        name="password"
                         type="password"
+                        autoComplete="current-password"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         placeholder="Enter your password"
                         value={password}
