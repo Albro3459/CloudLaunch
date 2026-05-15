@@ -1,7 +1,7 @@
 availability_domain     = "xJLJ:US-SANJOSE-1-AD-1"
-compartment_id          = "ocid1.tenancy.oc1..replace_me"
-subnet_id               = "ocid1.subnet.oc1.us-sanjose-1.replace_me"
-source_image_id         = "ocid1.image.oc1.us-sanjose-1.replace_me"
+compartment_id          = "ocid1.tenancy.oc1...replace_me"
+subnet_id               = "ocid1.subnet.oc1.us-sanjose-1...replace_me"
+source_image_id         = "ocid1.image.oc1.us-sanjose-1...replace_me"
 
 # OCI requires ssh-rsa!
 ssh_authorized_keys = [
@@ -28,8 +28,8 @@ wg_dns_address_v4               = "10.0.0.1"
 wg_dns_address_v6               = "fd42:42:42::1"
 wg_rate_limit                   = "25/second"
 wg_rate_limit_burst             = 100
-wg_server_private_key           = "REPLACE_WITH_SERVER_PRIVATE_KEY"
-wg_client_public_key            = "REPLACE_WITH_CLIENT_PUBLIC_KEY"
+wg_server_private_key           = "..._WITH_SERVER_PRIVATE_KEY"
+wg_client_public_key            = "..._WITH_CLIENT_PUBLIC_KEY"
 wg_peer_allowed_ipv4            = "10.0.0.2/32"
 wg_peer_allowed_ipv6            = "fd42:42:42::2/128"
 wg_peer_persistent_keepalive    = 25
