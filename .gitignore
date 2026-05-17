@@ -18,3 +18,5 @@ node_modules
 **/vm_dump.md
 
 **/__pycache__/
+
+lambda/.publish/

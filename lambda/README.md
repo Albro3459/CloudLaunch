@@ -89,7 +89,7 @@ From the `lambda/` directory, run one of:
 ./publish.sh SecureGet
 ```
 
-The script bumps the selected Lambda's `version.py`, stages the function in `~/Desktop/CloudLaunch-Publish/stage`, writes the zip to `~/Desktop/CloudLaunch-Publish/packages`, and publishes it with `aws lambda update-function-code` using the `cloudlaunch` AWS profile.
+The script bumps the selected Lambda's `version.py`, stages the function in `lambda/.publish/stage`, writes the zip to `lambda/.publish/packages`, and publishes it with `aws lambda update-function-code` using the `cloudlaunch` AWS profile.
 
 For the `Deploy` Lambda, `publish.sh` runs [build_deploy_lambda.sh](Deploy/build_deploy_lambda.sh) during staging so the package includes the required `terraform/` files from [OCI/terraform](../OCI/terraform).
 

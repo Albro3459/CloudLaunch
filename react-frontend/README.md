@@ -20,13 +20,13 @@ npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
 
 ---
 
-### Deploy GitHub page:
+### Publish GitHub page:
 
-* NOTE: This uses the your local build code to deploy. It does NOT pull from any remote branch. It compiles your code to the build folder and deploys that. 
+* NOTE: This uses the your local build code to publish. It does NOT pull from any remote branch. It compiles your code to the build folder and publishes that. 
     * Pro: Can be ran from any branch
     * Con: Must be run locally and it can be confusing
 
 ```sh
 cd react-frontend; 
-npm run deploy # Deploys to gh-pages branch
+npm run publish # publishes to gh-pages branch
 ````

@@ -4,12 +4,12 @@
 
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
+
 AWS_PROFILE_NAME="cloudlaunch"
-OUTPUT_ROOT="$HOME/Desktop/CloudLaunch-Publish"
+OUTPUT_ROOT="$script_dir/.publish"
 VERSION_FILE_NAME="version.py"
 BUMP_VERSION_SCRIPT="bump_version.py"
-
-script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 
 usage() {
   cat <<EOF

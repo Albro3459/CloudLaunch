@@ -5,9 +5,10 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
+lambda_root="$(cd -- "$script_dir/.." && pwd)"
 repo_root="$(cd -- "$script_dir/../.." && pwd)"
 
-output_dir="${CLOUDLAUNCH_PUBLISH_OUTPUT_DIR:-$HOME/Desktop/CloudLaunch-Publish}"
+output_dir="${CLOUDLAUNCH_PUBLISH_OUTPUT_DIR:-$lambda_root/.publish/stage/Deploy}"
 terraform_output_dir="$output_dir/terraform"
 
 if [ -e "$output_dir" ]; then
