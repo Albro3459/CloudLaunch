@@ -256,13 +256,6 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": f"Missing required parameters"})
             }
         
-        # Check if the user can make more VPNs
-        user_vpn_count = get_user_vpn_count(user_id, user_table)
-        vpn_role_max_count = get_max_count_for_role(role, role_table)
-        if user_vpn_count >= vpn_role_max_count:
-            return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
-        increment_user_count(user_id, user_table)
-                    
         # Make sure there are no running instances in the region for that user
         # if there are, just return that instance ID
         vpn = get_user_instances_in_region(user_id, role, oci_region)
@@ -281,6 +274,13 @@ def lambda_handler(event, context):
                     wireguard_options,
                 ))
             }
+
+        # Check if the user can make more VPNs
+        user_vpn_count = get_user_vpn_count(user_id, user_table)
+        vpn_role_max_count = get_max_count_for_role(role, role_table)
+        if user_vpn_count >= vpn_role_max_count:
+            return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
+        increment_user_count(user_id, user_table)
 
         # Deploy the OCI instance through Resource Manager
         result = deploy_instance(oci_config, vpn_config, user_id, oci_region)
@@ -304,16 +304,19 @@ def lambda_handler(event, context):
         if email != admin_email:
             emails.append(admin_email)
         
-        deliver_emails(
-            ses_client,
-            client_private_key,
-            server_public_key,
-            public_ip,
-            oci_region_name,
-            sender,
-            emails,
-            wireguard_options,
-        )
+        try:
+            deliver_emails(
+                ses_client,
+                client_private_key,
+                server_public_key,
+                public_ip,
+                oci_region_name,
+                sender,
+                emails,
+                wireguard_options,
+            )
+        except Exception as e:
+            print(f"Failed to deliver VPN email notification for {public_ip}: {e}")
 
         return {
             "statusCode": 200,

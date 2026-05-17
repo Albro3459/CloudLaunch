@@ -48,11 +48,12 @@ const Home: React.FC = () => {
             }
             else {
                 const response = await VPNdeployHelper(ACTION.DEPLOY, null, auth.currentUser?.email || "", region, jwtToken);
-            
-                setLoading(false);
 
                 if (!response.success) {
                     setErrorMessage(response.error || "Something went wrong");
+                    if (auth.currentUser) {
+                        await fillVPNs(auth.currentUser);
+                    }
                     return;
                 }
 
@@ -75,6 +76,11 @@ const Home: React.FC = () => {
         } catch (error) {
             setErrorMessage("Error during deployment");
             console.error("Error during deployment:", error);
+            if (auth.currentUser) {
+                await fillVPNs(auth.currentUser);
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
