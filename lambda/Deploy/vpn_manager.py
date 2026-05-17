@@ -614,11 +614,14 @@ def _destroy_stack(resource_manager_client, stack_id, timeout_seconds=JOB_TIMEOU
             }
 
         if getattr(job, "lifecycle_state", None) == "SUCCEEDED":
+            delete_result = _delete_stack_record(
+                resource_manager_client,
+                stack_id,
+                f"Destroy job {destroy_job.id} succeeded; deleted stack record",
+            )
             return {
-                "id": stack_id,
-                "status": "destroyed",
+                **delete_result,
                 "job_id": destroy_job.id,
-                "detail": f"Destroy job {destroy_job.id} succeeded",
             }
 
         try:
@@ -670,11 +673,14 @@ def _wait_for_running_destroy_job(resource_manager_client, stack_id, job_id, tim
     try:
         job = _wait_for_job(resource_manager_client, job_id, timeout_seconds)
         if getattr(job, "lifecycle_state", None) == "SUCCEEDED":
+            delete_result = _delete_stack_record(
+                resource_manager_client,
+                stack_id,
+                f"Destroy job {job_id} succeeded; deleted stack record",
+            )
             return {
-                "id": stack_id,
-                "status": "destroyed",
+                **delete_result,
                 "job_id": job_id,
-                "detail": f"Destroy job {job_id} succeeded",
             }
 
         return {
