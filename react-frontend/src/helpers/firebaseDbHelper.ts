@@ -15,7 +15,7 @@ export type VPNData = {
     email: string | null;
     region: string | null;
     instanceID: string;
-    ipv4: string;
+    ipv4: string | null;
     status: string;
 }
 
@@ -48,13 +48,13 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
 
             instanceSnapshots.forEach((instanceDoc) => {
                 const { ipv4, status } = instanceDoc.data();
-                if (ipv4 && status && status.toLowerCase() !== "terminated") {
+                if (status && status.toLowerCase() !== "terminated") {
                     vpnData.push({
                         userID: userID,
                         email: email,
                         region: regionID,
                         instanceID: instanceDoc.id,
-                        ipv4: ipv4,
+                        ipv4: ipv4 || null,
                         status: status,
                     });
                 }

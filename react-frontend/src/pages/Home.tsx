@@ -191,16 +191,13 @@ const Home: React.FC = () => {
         setVPNTableEntries(null);
         try {
             const VPNs: VPNData[] = await getUsersVPNs(user);
-            setVPNTableEntries(VPNs.map((vpn) => ({
-                ...vpn,
-                onQrCodeClick: () => handleQRcode(vpn.ipv4, vpn.region),
-            })))
+            setVPNTableEntries(VPNs);
         } catch (error) {
             setErrorMessage("Error loading VPN instances");
             console.error("Error loading VPN instances:", error);
             setVPNTableEntries([]);
         }
-    }, [handleQRcode]);
+    }, []);
 
     const handleDownload = () => {
         if (configData) {

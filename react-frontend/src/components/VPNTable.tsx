@@ -9,7 +9,7 @@ export type VPNTableEntry = {
     email: string | null;
     region: string | null;
     instanceID: string;
-    ipv4: string;
+    ipv4: string | null;
     status: string;
 };
 
@@ -42,7 +42,7 @@ const getStatusBadgeClasses = (status: string) => {
     }
 };
 
-const canShowConfig = (status: string) => status.toLowerCase() === "running";
+const canShowConfig = (entry: VPNTableEntry) => entry.status.toLowerCase() === "running" && !!entry.ipv4;
 
 const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean, regions: Region[] | null) => {
     return [...data].sort((a, b) => {
@@ -75,7 +75,7 @@ type VPNTableRowData = {
 };
 
 const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targets, toggleTarget, onQRCodeClick }) => {
-    const configAvailable = canShowConfig(entry.status);
+    const configAvailable = canShowConfig(entry);
 
     return (
         <tr className="border-b border-gray-100 hover:bg-gray-50">
@@ -92,7 +92,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targe
                 </>
             }
             <td className="px-4 py-2 text-center">{getRegionName(entry.region, regions) || "Null"}</td>
-            <td className="px-4 py-2 text-center">{entry.ipv4}</td>
+            <td className="px-4 py-2 text-center">{entry.ipv4 || "-"}</td>
             <td className="px-4 py-2 text-center">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(entry.status)}`}>
                     {capitalized(entry.status)}
@@ -100,7 +100,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targe
             </td>
             <td className="px-4 py-2 flex justify-center">
                 <button
-                    onClick={() => configAvailable && onQRCodeClick(entry.ipv4, entry.region)}
+                    onClick={() => configAvailable && entry.ipv4 && onQRCodeClick(entry.ipv4, entry.region)}
                     disabled={!configAvailable}
                     className={configAvailable ? "text-blue-600 hover:text-blue-800" : "text-gray-300 cursor-not-allowed"}
                 >
