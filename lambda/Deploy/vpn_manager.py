@@ -24,6 +24,9 @@ from get_secrets import OciSecretKey, VpnSecretKey, get_secret_value
 
 STACK_CREATE_TIMEOUT_SECONDS = 300
 JOB_TIMEOUT_SECONDS = 1800
+TERMINATE_JOB_TIMEOUT_SECONDS = 180
+TERMINATE_INSTANCE_TIMEOUT_SECONDS = 90
+TERMINATE_STACK_RETRY_TIMEOUT_SECONDS = 60
 PUBLIC_IP_TIMEOUT_SECONDS = 300
 INSTANCE_TERMINATION_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 5
@@ -524,7 +527,7 @@ def _wait_for_instance_absence_or_termination(compute_client, instance_id, timeo
     }
 
 
-def _terminate_instance_directly(compute_client, instance_id):
+def _terminate_instance_directly(compute_client, instance_id, timeout_seconds=INSTANCE_TERMINATION_TIMEOUT_SECONDS):
     try:
         status = _get_instance_cleanup_status(compute_client, instance_id)
         if status["status"] in {"absent", "terminated"}:
@@ -534,7 +537,7 @@ def _terminate_instance_directly(compute_client, instance_id):
         return _wait_for_instance_absence_or_termination(
             compute_client,
             instance_id,
-            INSTANCE_TERMINATION_TIMEOUT_SECONDS,
+            timeout_seconds,
         )
     except Exception as exc:
         if _is_missing_resource_error(exc):
@@ -571,7 +574,7 @@ def _delete_stack_record(resource_manager_client, stack_id, detail):
         }
 
 
-def _destroy_stack(resource_manager_client, stack_id):
+def _destroy_stack(resource_manager_client, stack_id, timeout_seconds=JOB_TIMEOUT_SECONDS):
     try:
         stack = resource_manager_client.get_stack(stack_id).data
     except Exception as exc:
@@ -600,11 +603,21 @@ def _destroy_stack(resource_manager_client, stack_id):
             "DESTROY",
             f"Destroy {stack_id}",
         )
-        job = _wait_for_job(resource_manager_client, destroy_job.id, JOB_TIMEOUT_SECONDS)
+        try:
+            job = _wait_for_job(resource_manager_client, destroy_job.id, timeout_seconds)
+        except TimeoutError as exc:
+            return {
+                "id": stack_id,
+                "status": "running",
+                "job_id": destroy_job.id,
+                "detail": str(exc),
+            }
+
         if getattr(job, "lifecycle_state", None) == "SUCCEEDED":
             return {
                 "id": stack_id,
                 "status": "destroyed",
+                "job_id": destroy_job.id,
                 "detail": f"Destroy job {destroy_job.id} succeeded",
             }
 
@@ -615,18 +628,21 @@ def _destroy_stack(resource_manager_client, stack_id):
                 return {
                     "id": stack_id,
                     "status": "absent",
+                    "job_id": destroy_job.id,
                     "detail": "Stack became absent during destroy",
                 }
         if getattr(stack, "lifecycle_state", None) == "DELETED":
             return {
                 "id": stack_id,
                 "status": "absent",
+                "job_id": destroy_job.id,
                 "detail": "Stack became absent during destroy",
             }
 
         return {
             "id": stack_id,
             "status": "failed",
+            "job_id": destroy_job.id,
             "detail": (
                 f"Destroy job {destroy_job.id} ended in state {job.lifecycle_state}. "
                 f"Log tail: {_get_job_logs_tail(resource_manager_client, destroy_job.id)}"
@@ -648,6 +664,49 @@ def _destroy_stack(resource_manager_client, stack_id):
 
 def _is_stack_cleanup_completed(stack_result):
     return stack_result["status"] in {"destroyed", "deleted", "absent"}
+
+
+def _wait_for_running_destroy_job(resource_manager_client, stack_id, job_id, timeout_seconds):
+    try:
+        job = _wait_for_job(resource_manager_client, job_id, timeout_seconds)
+        if getattr(job, "lifecycle_state", None) == "SUCCEEDED":
+            return {
+                "id": stack_id,
+                "status": "destroyed",
+                "job_id": job_id,
+                "detail": f"Destroy job {job_id} succeeded",
+            }
+
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "job_id": job_id,
+            "detail": (
+                f"Destroy job {job_id} ended in state {job.lifecycle_state}. "
+                f"Log tail: {_get_job_logs_tail(resource_manager_client, job_id)}"
+            ),
+        }
+    except TimeoutError as exc:
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "job_id": job_id,
+            "detail": str(exc),
+        }
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": stack_id,
+                "status": "absent",
+                "job_id": job_id,
+                "detail": "Stack already absent",
+            }
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "job_id": job_id,
+            "detail": str(exc),
+        }
 
 
 def _cleanup_stack_after_direct_instance_termination(resource_manager_client, stack_id, initial_stack_result):
@@ -687,7 +746,16 @@ def _cleanup_stack_after_direct_instance_termination(resource_manager_client, st
             ),
         }
 
-    retry_result = _destroy_stack(resource_manager_client, stack_id)
+    if initial_stack_result.get("status") == "running" and initial_stack_result.get("job_id"):
+        retry_result = _wait_for_running_destroy_job(
+            resource_manager_client,
+            stack_id,
+            initial_stack_result["job_id"],
+            TERMINATE_STACK_RETRY_TIMEOUT_SECONDS,
+        )
+    else:
+        retry_result = _destroy_stack(resource_manager_client, stack_id, TERMINATE_STACK_RETRY_TIMEOUT_SECONDS)
+
     if _is_stack_cleanup_completed(retry_result):
         return retry_result
 
@@ -800,7 +868,7 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
 
     if stack_id:
         if instance_ocid:
-            stack_result = _destroy_stack(resource_manager_client, stack_id)
+            stack_result = _destroy_stack(resource_manager_client, stack_id, TERMINATE_JOB_TIMEOUT_SECONDS)
         elif stack_state and stack_state.get("stack_absent"):
             stack_result = {
                 "id": stack_id,
@@ -834,12 +902,20 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
             instance_result = _wait_for_instance_absence_or_termination(
                 compute_client,
                 instance_ocid,
-                INSTANCE_TERMINATION_TIMEOUT_SECONDS,
+                TERMINATE_INSTANCE_TIMEOUT_SECONDS,
             )
             if instance_result["status"] not in {"absent", "terminated"}:
-                instance_result = _terminate_instance_directly(compute_client, instance_ocid)
+                instance_result = _terminate_instance_directly(
+                    compute_client,
+                    instance_ocid,
+                    TERMINATE_INSTANCE_TIMEOUT_SECONDS,
+                )
         else:
-            instance_result = _terminate_instance_directly(compute_client, instance_ocid)
+            instance_result = _terminate_instance_directly(
+                compute_client,
+                instance_ocid,
+                TERMINATE_INSTANCE_TIMEOUT_SECONDS,
+            )
             if (
                 stack_id
                 and instance_result["status"] in {"absent", "terminated"}

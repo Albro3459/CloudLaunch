@@ -10,6 +10,20 @@ The secret has four top-level objects: aws, firebase, oci, vpn
 
 Keep AWS SES email and the Admin email in AWS  the complete Firebase service-account JSON in `firebase`, all OCI API signing and Terraform values in `oci`, and WireGuard runtime values in `vpn`.
 
+## Configuration
+* CreateUser:
+  * Memory: 512 mb (speeds up cold starts)
+  * Storage: 512 mb
+  * Timeout: 1 min 
+* Deploy:
+  * Memory: 512 mb (256 minimum)
+  * Storage: 512 mb
+  * Timeout: 7 min 30 sec (Need enough time to terminate the instance and the stack)
+* SecureGet:
+  * Memory: 512 mb (speeds up cold starts)
+  * Storage: 512 mb
+  * Timeout: 1 min 
+
 ## OCI Deployment Flow
 
 The `Deploy` Lambda does not import the Python `oci` SDK. It signs direct HTTPS requests with the API key values from `CloudLaunch.oci`.
