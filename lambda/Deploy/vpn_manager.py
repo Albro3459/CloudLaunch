@@ -279,6 +279,7 @@ def _build_stack_variables(oci_config, vpn_config, instance_name):
 
     variables = {
         "availability_domain": get_secret_value(oci_config, OciSecretKey.AVAILABILITY_DOMAIN),
+        "region": get_secret_value(oci_config, OciSecretKey.REGION),
         "compartment_id": get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
         "subnet_id": get_secret_value(oci_config, OciSecretKey.SUBNET_ID),
         "source_image_id": get_secret_value(oci_config, OciSecretKey.SOURCE_IMAGE_ID),

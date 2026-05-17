@@ -1,4 +1,6 @@
-provider "oci" {}
+provider "oci" {
+	region = var.region
+}
 
 terraform {
   required_providers {
@@ -11,6 +13,11 @@ terraform {
 variable "availability_domain" {
 	type = string
 	description = "OCI availability domain, for example xJLJ:US-SANJOSE-1-AD-1"
+}
+
+variable "region" {
+	type = string
+	description = "OCI region identifier, for example us-sanjose-1"
 }
 
 variable "compartment_id" {

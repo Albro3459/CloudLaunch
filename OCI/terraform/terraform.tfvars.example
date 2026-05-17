@@ -1,4 +1,5 @@
 availability_domain     = "xJLJ:US-SANJOSE-1-AD-1"
+region                  = "us-sanjose-1"
 compartment_id          = "ocid1.tenancy.oc1...replace_me"
 subnet_id               = "ocid1.subnet.oc1.us-sanjose-1...replace_me"
 source_image_id         = "ocid1.image.oc1.us-sanjose-1...replace_me"
