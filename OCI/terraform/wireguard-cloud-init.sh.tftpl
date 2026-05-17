@@ -19,7 +19,7 @@ wait_for_apt() {
 }
 
 WG_INTERFACE="${wg_interface}"
-LISTEN_PORT="${listen_port}"
+LISTEN_PORT="${wg_listen_port}"
 WG_ADDRESS_V4="${wg_address_v4}"
 WG_ADDRESS_V6="${wg_address_v6}"
 WG_DNS_ADDRESS_V4="${wg_dns_address_v4}"
@@ -27,8 +27,8 @@ WG_DNS_ADDRESS_V6="${wg_dns_address_v6}"
 WG_NETWORK_V4="${wg_network_v4}"
 WG_NETWORK_V6="${wg_network_v6}"
 WG_SERVER_PRIVATE_KEY="${wg_server_private_key}"
-RATE_LIMIT="${rate_limit}"
-RATE_LIMIT_BURST="${rate_limit_burst}"
+RATE_LIMIT="${wg_rate_limit}"
+RATE_LIMIT_BURST="${wg_rate_limit_burst}"
 PRIMARY_IFACE="$(ip route show default | awk '/default/ { print $5; exit }')"
 
 if [[ -z "$PRIMARY_IFACE" ]]; then
@@ -146,9 +146,9 @@ PostDown = ip6tables -D INPUT -i $WG_INTERFACE -d $WG_DNS_ADDRESS_V6 -p udp --dp
 PostDown = ip6tables -D INPUT -i $WG_INTERFACE -d $WG_DNS_ADDRESS_V6 -p tcp --dport 53 -j ACCEPT
 
 [Peer]
-PublicKey = ${peer.public_key}
-AllowedIPs = ${peer.allowed_ipv4}, ${peer.allowed_ipv6}
-PersistentKeepalive = ${peer.persistent_keepalive}
+PublicKey = ${wg_peer.wg_client_public_key}
+AllowedIPs = ${wg_peer.wg_peer_allowed_ipv4}, ${wg_peer.wg_peer_allowed_ipv6}
+PersistentKeepalive = ${wg_peer.wg_peer_persistent_keepalive}
 WGCONF
 
 chmod 600 "/etc/wireguard/$WG_INTERFACE.conf"
@@ -187,7 +187,7 @@ server:
   do-tcp: yes
   prefer-ip6: yes
   root-hints: "/usr/share/dns/root.hints"
-${DNSSEC_CONFIG}
+$${DNSSEC_CONFIG}
   qname-minimisation: yes
   hide-identity: yes
   hide-version: yes
@@ -201,7 +201,7 @@ echo "==> Step 8/8: Starting WireGuard and unbound"
 systemctl enable --now "wg-quick@$WG_INTERFACE"
 
 for _ in $(seq 1 30); do
-  if ip -4 addr show dev "$WG_INTERFACE" | grep -Fq "${WG_DNS_ADDRESS_V4}/" && ip -6 addr show dev "$WG_INTERFACE" | grep -Fq "${WG_DNS_ADDRESS_V6}/"; then
+  if ip -4 addr show dev "$WG_INTERFACE" | grep -Fq "$${WG_DNS_ADDRESS_V4}/" && ip -6 addr show dev "$WG_INTERFACE" | grep -Fq "$${WG_DNS_ADDRESS_V6}/"; then
     break
   fi
 
@@ -209,12 +209,12 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-if ! ip -4 addr show dev "$WG_INTERFACE" | grep -Fq "${WG_DNS_ADDRESS_V4}/"; then
+if ! ip -4 addr show dev "$WG_INTERFACE" | grep -Fq "$${WG_DNS_ADDRESS_V4}/"; then
   echo "$WG_INTERFACE never received $WG_DNS_ADDRESS_V4" >&2
   exit 1
 fi
 
-if ! ip -6 addr show dev "$WG_INTERFACE" | grep -Fq "${WG_DNS_ADDRESS_V6}/"; then
+if ! ip -6 addr show dev "$WG_INTERFACE" | grep -Fq "$${WG_DNS_ADDRESS_V6}/"; then
   echo "$WG_INTERFACE never received $WG_DNS_ADDRESS_V6" >&2
   exit 1
 fi

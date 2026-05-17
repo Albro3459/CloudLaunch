@@ -162,21 +162,21 @@ locals {
 
 	wireguard_user_data = templatefile("${path.module}/wireguard-cloud-init.sh.tftpl", {
 		wg_interface = var.wg_interface
-		listen_port = var.wg_listen_port
+		wg_listen_port = var.wg_listen_port
 		wg_address_v4 = var.wg_address_v4
 		wg_address_v6 = var.wg_address_v6
 		wg_dns_address_v4 = var.wg_dns_address_v4
 		wg_dns_address_v6 = var.wg_dns_address_v6
 		wg_network_v4 = var.wg_network_v4
 		wg_network_v6 = var.wg_network_v6
-		server_private_key = var.wg_server_private_key
-		rate_limit = var.wg_rate_limit
-		rate_limit_burst = var.wg_rate_limit_burst
-		peer = {
-			public_key = var.wg_client_public_key
-			allowed_ipv4 = var.wg_peer_allowed_ipv4
-			allowed_ipv6 = var.wg_peer_allowed_ipv6
-			persistent_keepalive = var.wg_peer_persistent_keepalive
+		wg_server_private_key = var.wg_server_private_key
+		wg_rate_limit = var.wg_rate_limit
+		wg_rate_limit_burst = var.wg_rate_limit_burst
+		wg_peer = {
+			wg_client_public_key = var.wg_client_public_key
+			wg_peer_allowed_ipv4 = var.wg_peer_allowed_ipv4
+			wg_peer_allowed_ipv6 = var.wg_peer_allowed_ipv6
+			wg_peer_persistent_keepalive = var.wg_peer_persistent_keepalive
 		}
 	})
 
