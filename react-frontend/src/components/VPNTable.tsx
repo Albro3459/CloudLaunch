@@ -3,6 +3,7 @@ import { QrCode } from "lucide-react";
 import { Targets } from "../helpers/APIHelper";
 import { TOGGLE } from "../pages/Home";
 import { getRegionName, Region } from "../helpers/regionsHelper";
+import { formatVPNStatus, VPN_STATUS, VPNStatus } from "../helpers/vpnStatus";
 
 export type VPNTableEntry = {
     userID: string;
@@ -10,7 +11,7 @@ export type VPNTableEntry = {
     region: string | null;
     instanceID: string;
     ipv4: string | null;
-    status: string;
+    status: VPNStatus;
 };
 
 type VPNTableData = {
@@ -23,26 +24,22 @@ type VPNTableData = {
     onQRCodeClick: (ipv4: string, region: string | null) => void;
 };
 
-const capitalized = (str: string) => {
-    return str[0].toUpperCase() + str.slice(1).toLowerCase();
-};
-
-const getStatusBadgeClasses = (status: string) => {
-    switch (status.toLowerCase()) {
-        case "running":
+const getStatusBadgeClasses = (status: VPNStatus) => {
+    switch (status) {
+        case VPN_STATUS.RUNNING:
             return "bg-green-100 text-green-800 border-green-200";
-        case "pending":
+        case VPN_STATUS.PENDING:
             return "bg-yellow-100 text-yellow-800 border-yellow-200";
-        case "failed":
+        case VPN_STATUS.FAILED:
             return "bg-red-100 text-red-800 border-red-200";
-        case "terminated":
+        case VPN_STATUS.TERMINATED:
             return "bg-red-950 text-red-50 border-red-950";
         default:
             return "bg-gray-100 text-gray-700 border-gray-200";
     }
 };
 
-const canShowConfig = (entry: VPNTableEntry) => entry.status.toLowerCase() === "running" && !!entry.ipv4;
+const canShowConfig = (entry: VPNTableEntry) => entry.status === VPN_STATUS.RUNNING && !!entry.ipv4;
 
 const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean, regions: Region[] | null) => {
     return [...data].sort((a, b) => {
@@ -95,7 +92,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targe
             <td className="px-4 py-2 text-center">{entry.ipv4 || "-"}</td>
             <td className="px-4 py-2 text-center">
                 <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(entry.status)}`}>
-                    {capitalized(entry.status)}
+                    {formatVPNStatus(entry.status)}
                 </span>
             </td>
             <td className="px-4 py-2 flex justify-center">

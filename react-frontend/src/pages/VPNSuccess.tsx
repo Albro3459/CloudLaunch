@@ -6,10 +6,12 @@ import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
 import { saveAs } from "file-saver";
 import { auth, onAuthStateChanged } from "../firebase";
 import { logout } from "../helpers/firebaseDbHelper";
+import { normalizeVPNStatus, VPN_STATUS, VPNStatus } from "../helpers/vpnStatus";
 
 interface VPNSuccessState {
     region: string | null;
     isNew: boolean | null;
+    status: VPNStatus | null;
     ip: string | null;
     wireguard_config: string | null;
 }
@@ -18,16 +20,21 @@ const VPNSuccess: React.FC = () => {
     const navigate = useNavigate();
 
     const location = useLocation();
-    const { region, isNew, ip, wireguard_config } = (location.state || {}) satisfies Partial<VPNSuccessState>;
+    const { region, isNew, status, ip, wireguard_config } = (location.state || {}) satisfies Partial<VPNSuccessState>;
+    const normalizedStatus = normalizeVPNStatus(status);
+    const hasVPN = !!ip && ip.length > 0;
+    const isPending = normalizedStatus === VPN_STATUS.PENDING;
     
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        if (wireguard_config) {
+        if (hasVPN && wireguard_config) {
             setConfigData(wireguard_config);
+        } else {
+            setConfigData(null);
         }
-    }, [wireguard_config]);
+    }, [hasVPN, wireguard_config]);
 
     useEffect(() => {
         if (configData && canvasRef.current) {
@@ -40,7 +47,7 @@ const VPNSuccess: React.FC = () => {
     }, [configData]);
 
     const handleDownload = () => {
-        if (configData) {
+        if (hasVPN && configData) {
             const blob = new Blob([configData], { type: "text/plain;charset=utf-8" });
             saveAs(blob, `wireguard.conf`);
         }
@@ -79,19 +86,27 @@ const VPNSuccess: React.FC = () => {
 
             <div className="bg-white p-6 md:p-8 rounded-2xl shadow-lg w-full max-w-lg text-center">
                 <h2 className="text-2xl font-semibold mb-4">
-                    {isNew ? (
+                    {isPending ? (
                         <>
-                            Deployment  {ip && ip.length > 0 ? "Successful 🎉" : "Failure ❌"}
+                            Deployment Pending
+                        </>
+                    ) : isNew ? (
+                        <>
+                            Deployment  {hasVPN ? "Successful 🎉" : "Failure ❌"}
                         </>
                     ) : (
                         <>
-                            {ip && ip.length > 0 ? "Success 🎉" : "Fail ❌"}
+                            {hasVPN ? "Success 🎉" : "Fail ❌"}
                         </>
                     )}
                     
                 </h2>
 
-                {ip && ip.length > 0 ? (
+                {isPending ? (
+                    <p className="text-gray-700">
+                        Your VPN is still being created in <b>{region}</b>. Check the VPN table for status.
+                    </p>
+                ) : hasVPN ? (
                     <p className="text-gray-700">
                         {isNew ? (
                             <>
@@ -107,14 +122,14 @@ const VPNSuccess: React.FC = () => {
                     <p className="text-gray-700">No VPN was deployed.</p>
                 )}
 
-                {ip && ip.length > 0 && (
+                {hasVPN && (
                     <p className="pt-1 text-gray-700">
                         IP Address: <b>{ip}</b>
                     </p>
                 )}
 
                 {/* QR Code Canvas */}
-                {configData && (
+                {hasVPN && configData && (
                     <>
                         <canvas ref={canvasRef} className="mt-4 mx-auto"></canvas>
                         <button 

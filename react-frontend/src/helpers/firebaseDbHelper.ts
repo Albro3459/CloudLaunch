@@ -4,6 +4,7 @@ import { getFirestore, collection, getDocs } from "firebase/firestore";
 import { NavigateFunction } from "react-router-dom";
 
 import { getUserRole } from "./usersHelper";
+import { normalizeVPNStatus, VPN_STATUS, VPNStatus } from "./vpnStatus";
 
 export const logout = async (navigate: NavigateFunction) => {
     await signOut(auth);
@@ -16,7 +17,7 @@ export type VPNData = {
     region: string | null;
     instanceID: string;
     ipv4: string | null;
-    status: string;
+    status: VPNStatus;
 }
 
 export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
@@ -47,8 +48,9 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
             const instanceSnapshots = await getDocs(instancesRef);
 
             instanceSnapshots.forEach((instanceDoc) => {
-                const { ipv4, status } = instanceDoc.data();
-                if (status && status.toLowerCase() !== "terminated") {
+                const { ipv4, status: rawStatus } = instanceDoc.data();
+                const status = normalizeVPNStatus(rawStatus);
+                if (status && status !== VPN_STATUS.TERMINATED) {
                     vpnData.push({
                         userID: userID,
                         email: email,

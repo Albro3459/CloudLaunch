@@ -12,6 +12,7 @@ import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { fetchOciRegions, useOciRegionsStore } from "../stores/ociRegionsStore";
+import { normalizeVPNStatus } from "../helpers/vpnStatus";
 
 export enum TOGGLE {
     ADD,
@@ -57,7 +58,8 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { isNew, region: deployRegion, ip_addresses, wireguard_config } = response.data;
+                const { isNew, status, region: deployRegion, ip_addresses, wireguard_config } = response.data;
+                const deployStatus = normalizeVPNStatus(status);
                 const publicIPv4 = ip_addresses?.public_ipv4 || "";
                 const ociRegion = deployRegion?.oci_region || region;
                 const ociRegionName = deployRegion?.oci_region_name || getRegionName(ociRegion, ociRegions);
@@ -67,6 +69,7 @@ const Home: React.FC = () => {
                     state: {
                         region: ociRegionName,
                         isNew: isNew,
+                        status: deployStatus,
                         ip: publicIPv4,
                         wireguard_config: wireguard_config
                     }

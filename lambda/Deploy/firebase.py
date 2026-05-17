@@ -3,6 +3,8 @@ from firebase_admin import credentials, auth, firestore
 
 from datetime import datetime, timezone
 
+from vpn_status import ACTIVE_VPN_STATUSES, VPNStatus, normalize_vpn_status
+
 
 def _utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -84,16 +86,19 @@ def get_users_instances(user_id, regions_filter=None):
                 continue
             region_id = region_doc.id
             instances_ref = regions_ref.document(region_id).collection("Instances")
-            query = instances_ref.where("status", "in", ["Pending", "Running"]) # Live statuses
+            query = instances_ref.where("status", "in", ACTIVE_VPN_STATUSES)
             docs = query.stream()
 
             instances = []
             for doc in docs:
                 data = doc.to_dict()
+                status = normalize_vpn_status(data.get("status"))
+                if not status:
+                    continue
                 instance = {
                     "id": doc.id,
                     "name": data.get("name"),
-                    "status": data.get("status"),
+                    "status": status,
                     "createdAt": data.get("createdAt"),
                     "ipv4": data.get("ipv4")
                 }
@@ -137,6 +142,7 @@ def get_instance(uid, region, instance_id):
 
         data = doc.to_dict() or {}
         data["id"] = doc.id
+        data["status"] = normalize_vpn_status(data.get("status"))
         return data
     except Exception as e:
         print(f"Error fetching instance {instance_id}: {e}")
@@ -153,7 +159,7 @@ def upsert_stack_backed_instance_record(uid, region, stack_id, instance_name):
         "ipv4": None,
         "lastError": None,
         "name": instance_name,
-        "status": "Pending",
+        "status": VPNStatus.PENDING.value,
     }, merge=True)
     print(f"Stack-backed instance record {stack_id} saved for user {uid} in region {region}.")
 
@@ -176,7 +182,7 @@ def mark_instance_running(uid, region, stack_id, ipv4):
     instance_ref.set({
         "ipv4": ipv4,
         "lastError": None,
-        "status": "Running",
+        "status": VPNStatus.RUNNING.value,
     }, merge=True)
     print(f"Instance record {stack_id} marked Running for user {uid} in region {region}.")
 
@@ -187,7 +193,7 @@ def mark_instance_failed(uid, region, stack_id, error_message):
 
     instance_ref.set({
         "lastError": error_message,
-        "status": "Failed",
+        "status": VPNStatus.FAILED.value,
     }, merge=True)
     print(f"Instance record {stack_id} marked Failed for user {uid} in region {region}.")
 
@@ -198,7 +204,7 @@ def mark_instance_terminated(uid, region, instance_id):
 
     instance_ref.set({
         "lastError": None,
-        "status": "Terminated",
+        "status": VPNStatus.TERMINATED.value,
         "terminatedAt": _utc_now_iso(),
     }, merge=True)
     print(f"Instance {instance_id} in region {region} marked Terminated for user {uid}.")
@@ -216,9 +222,13 @@ def record_instance_cleanup_error(uid, region, instance_id, error_message):
 
 def update_instance_status(uid, region, instance_id, status):
     try:
+        normalized_status = normalize_vpn_status(status)
+        if not normalized_status:
+            raise ValueError(f"Invalid VPN status: {status}")
+
         _, instance_ref = _get_instance_ref(uid, region, instance_id)
 
-        instance_ref.update({"status": status})
+        instance_ref.update({"status": normalized_status.value})
         print(f"Instance {instance_id} in region {region} updated for user {uid}.")
     except Exception as e:
         print(f"Error updating instance status: {e}")
@@ -228,6 +238,10 @@ def batch_update_instance_statuses(uid, region_instance_map, status):
     region_instance_map in the form: { "us-east1": ["i-1", "i-2"], "eu-west1": ["i-3"] }
     """
     try:
+        normalized_status = normalize_vpn_status(status)
+        if not normalized_status:
+            raise ValueError(f"Invalid VPN status: {status}")
+
         db = firestore.client()
         batch = db.batch()
 
@@ -242,10 +256,10 @@ def batch_update_instance_statuses(uid, region_instance_map, status):
 
             for instance_id in instance_ids:
                 ref = instances_ref.document(instance_id)
-                batch.update(ref, {"status": status})
+                batch.update(ref, {"status": normalized_status.value})
 
         batch.commit()
-        print(f"Batch updated status to '{status}' for instances in: {region_instance_map}")
+        print(f"Batch updated status to '{normalized_status.value}' for instances in: {region_instance_map}")
     except Exception as e:
         print(f"Error in batch update: {e}")
 

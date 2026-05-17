@@ -23,6 +23,7 @@ from get_secrets import (
 )
 from notify import deliver_emails
 from config_helper import get_config, get_wireguard_config_options
+from vpn_status import VPNStatus, normalize_vpn_status
 
 AWS_REGION = "us-west-1"
 
@@ -49,9 +50,14 @@ def _record_cleanup_error_safely(uid, region, instance_id, error_message):
     except Exception as e:
         print(f"Failed to persist cleanup error for {instance_id}: {e}")
 
-def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, client_private_key, server_public_key, wireguard_options):
-    return {
+def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, client_private_key, server_public_key, wireguard_options, status: VPNStatus = VPNStatus.RUNNING):
+    normalized_status = normalize_vpn_status(status)
+    if not normalized_status:
+        raise ValueError(f"Invalid VPN status: {status}")
+
+    response = {
         "isNew": is_new,
+        "status": normalized_status.value,
         "region": {
             "oci_region": oci_region,
             "oci_region_name": oci_region_name,
@@ -59,13 +65,18 @@ def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, cli
         "ip_addresses": {
             "public_ipv4": public_ipv4,
         },
-        "wireguard_config": get_config(
+        "wireguard_config": None,
+    }
+
+    if public_ipv4:
+        response["wireguard_config"] = get_config(
             client_private_key,
             server_public_key,
             public_ipv4,
             wireguard_options,
-        ),
-    }
+        )
+
+    return response
 
 def lambda_handler(event, context):
     """
@@ -256,11 +267,44 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": f"Missing required parameters"})
             }
         
-        # Make sure there are no running instances in the region for that user
-        # if there are, just return that instance ID
+        # Make sure there are no active instances in the region for that user.
         vpn = get_user_instances_in_region(user_id, role, oci_region)
         if vpn:
-            instance_ip = list(vpn.values())[0][0]["ipv4"]
+            existing_instances = [
+                instance
+                for instances in vpn.values()
+                for instance in instances
+            ]
+            running_instance = next(
+                (
+                    instance
+                    for instance in existing_instances
+                    if instance.get("status") == VPNStatus.RUNNING and instance.get("ipv4")
+                ),
+                None,
+            )
+
+            if not running_instance:
+                existing_status = normalize_vpn_status(existing_instances[0].get("status"))
+                if not existing_status:
+                    raise ValueError(f"Invalid existing VPN status: {existing_instances[0].get('status')}")
+
+                print(f"VPN already exists in region {oci_region} for user {user_id} with status {existing_status}")
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps(_build_deploy_response(
+                        False,
+                        oci_region,
+                        oci_region_name,
+                        None,
+                        client_private_key,
+                        server_public_key,
+                        wireguard_options,
+                        existing_status,
+                    ))
+                }
+
+            instance_ip = running_instance["ipv4"]
             print(f"VPN {instance_ip} already exists in region {oci_region} for user {user_id}")
             return {
                 "statusCode": 200,
