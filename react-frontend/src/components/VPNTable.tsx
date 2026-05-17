@@ -12,6 +12,7 @@ export type VPNTableEntry = {
     instanceID: string;
     ipv4: string | null;
     status: VPNStatus;
+    wireguardConfig: string | null;
 };
 
 type VPNTableData = {
@@ -21,7 +22,7 @@ type VPNTableData = {
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
     actionFunc: (targets: Targets) => void;
-    onQRCodeClick: (ipv4: string, region: string | null) => void;
+    onQRCodeClick: (entry: VPNTableEntry) => void;
 };
 
 const getStatusBadgeClasses = (status: VPNStatus) => {
@@ -39,7 +40,9 @@ const getStatusBadgeClasses = (status: VPNStatus) => {
     }
 };
 
-const canShowConfig = (entry: VPNTableEntry) => entry.status === VPN_STATUS.RUNNING && !!entry.ipv4;
+const canShowConfig = (entry: VPNTableEntry) => (
+    entry.status === VPN_STATUS.RUNNING && !!entry.ipv4 && !!entry.wireguardConfig
+);
 
 const sortedData = (data: VPNTableEntry[], sortField: string | null, sortAsc: boolean, regions: Region[] | null) => {
     return [...data].sort((a, b) => {
@@ -68,7 +71,7 @@ type VPNTableRowData = {
     regions: Region[] | null;
     targets: Targets;
     toggleTarget: (toggle: TOGGLE, userID: string, region: string | null, instanceID: string) => void;
-    onQRCodeClick: (ipv4: string, region: string | null) => void;
+    onQRCodeClick: (entry: VPNTableEntry) => void;
 };
 
 const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targets, toggleTarget, onQRCodeClick }) => {
@@ -97,7 +100,7 @@ const VPNTableRow: React.FC<VPNTableRowData> = ({ entry, isAdmin, regions, targe
             </td>
             <td className="px-4 py-2 flex justify-center">
                 <button
-                    onClick={() => configAvailable && entry.ipv4 && onQRCodeClick(entry.ipv4, entry.region)}
+                    onClick={() => configAvailable && onQRCodeClick(entry)}
                     disabled={!configAvailable}
                     className={configAvailable ? "text-blue-600 hover:text-blue-800" : "text-gray-300 cursor-not-allowed"}
                 >

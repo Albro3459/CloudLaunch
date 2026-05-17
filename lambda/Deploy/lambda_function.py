@@ -9,6 +9,7 @@ from firebase import (
     initialize_firebase,
     mark_instance_terminated,
     record_instance_cleanup_error,
+    save_instance_wireguard_config,
     verify_firebase_token,
     get_user_role,
 )
@@ -50,7 +51,24 @@ def _record_cleanup_error_safely(uid, region, instance_id, error_message):
     except Exception as e:
         print(f"Failed to persist cleanup error for {instance_id}: {e}")
 
-def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, client_private_key, server_public_key, wireguard_options, status: VPNStatus = VPNStatus.RUNNING):
+
+def _save_wireguard_config_safely(uid, region, instance_id, wireguard_config):
+    try:
+        save_instance_wireguard_config(uid, region, instance_id, wireguard_config)
+    except Exception as e:
+        print(f"Failed to persist WireGuard config for {instance_id}: {e}")
+
+
+def _build_wireguard_config(client_private_key, server_public_key, public_ipv4, wireguard_options):
+    return get_config(
+        client_private_key,
+        server_public_key,
+        public_ipv4,
+        wireguard_options,
+    )
+
+
+def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, wireguard_config, status: VPNStatus = VPNStatus.RUNNING):
     normalized_status = normalize_vpn_status(status)
     if not normalized_status:
         raise ValueError(f"Invalid VPN status: {status}")
@@ -65,16 +83,8 @@ def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, cli
         "ip_addresses": {
             "public_ipv4": public_ipv4,
         },
-        "wireguard_config": None,
+        "wireguard_config": wireguard_config,
     }
-
-    if public_ipv4:
-        response["wireguard_config"] = get_config(
-            client_private_key,
-            server_public_key,
-            public_ipv4,
-            wireguard_options,
-        )
 
     return response
 
@@ -297,14 +307,22 @@ def lambda_handler(event, context):
                         oci_region,
                         oci_region_name,
                         None,
-                        client_private_key,
-                        server_public_key,
-                        wireguard_options,
+                        None,
                         existing_status,
                     ))
                 }
 
             instance_ip = running_instance["ipv4"]
+            instance_id = running_instance["id"]
+            wireguard_config = running_instance.get("wireguardConfig")
+            if instance_ip and not wireguard_config:
+                wireguard_config = _build_wireguard_config(
+                    client_private_key,
+                    server_public_key,
+                    instance_ip,
+                    wireguard_options,
+                )
+                _save_wireguard_config_safely(user_id, oci_region, instance_id, wireguard_config)
             print(f"VPN {instance_ip} already exists in region {oci_region} for user {user_id}")
             return {
                 "statusCode": 200,
@@ -313,9 +331,8 @@ def lambda_handler(event, context):
                     oci_region,
                     oci_region_name,
                     instance_ip,
-                    client_private_key,
-                    server_public_key,
-                    wireguard_options,
+                    wireguard_config,
+                    VPNStatus.RUNNING,
                 ))
             }
 
@@ -341,6 +358,15 @@ def lambda_handler(event, context):
                 "statusCode": 500,
                 "body": json.dumps({"error": "Failed to deploy instance"})
             }
+
+        wireguard_config = _build_wireguard_config(
+            client_private_key,
+            server_public_key,
+            public_ip,
+            wireguard_options,
+        )
+        stack_id = result.get("stack_id") or instance_id
+        _save_wireguard_config_safely(user_id, oci_region, stack_id, wireguard_config)
             
         # Send emails
         ses_client = boto3.client('sesv2', region_name=AWS_REGION)
@@ -369,9 +395,7 @@ def lambda_handler(event, context):
                 oci_region,
                 oci_region_name,
                 public_ip,
-                client_private_key,
-                server_public_key,
-                wireguard_options,
+                wireguard_config,
             ))
         }
     else:

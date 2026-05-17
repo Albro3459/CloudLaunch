@@ -100,7 +100,8 @@ def get_users_instances(user_id, regions_filter=None):
                     "name": data.get("name"),
                     "status": status,
                     "createdAt": data.get("createdAt"),
-                    "ipv4": data.get("ipv4")
+                    "ipv4": data.get("ipv4"),
+                    "wireguardConfig": data.get("wireguardConfig"),
                 }
                 instances.append(instance)
 
@@ -185,6 +186,16 @@ def mark_instance_running(uid, region, stack_id, ipv4):
         "status": VPNStatus.RUNNING.value,
     }, merge=True)
     print(f"Instance record {stack_id} marked Running for user {uid} in region {region}.")
+
+
+def save_instance_wireguard_config(uid, region, instance_id, wireguard_config):
+    region_ref, instance_ref = _get_instance_ref(uid, region, instance_id)
+    _ensure_region_exists(region_ref)
+
+    instance_ref.set({
+        "wireguardConfig": wireguard_config,
+    }, merge=True)
+    print(f"WireGuard config saved for instance {instance_id} in region {region} for user {uid}.")
 
 
 def mark_instance_failed(uid, region, stack_id, error_message):

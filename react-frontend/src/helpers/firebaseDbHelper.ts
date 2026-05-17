@@ -18,6 +18,7 @@ export type VPNData = {
     instanceID: string;
     ipv4: string | null;
     status: VPNStatus;
+    wireguardConfig: string | null;
 }
 
 export const getUsersVPNs = async (user: User): Promise<VPNData[]> => {
@@ -48,7 +49,7 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
             const instanceSnapshots = await getDocs(instancesRef);
 
             instanceSnapshots.forEach((instanceDoc) => {
-                const { ipv4, status: rawStatus } = instanceDoc.data();
+                const { ipv4, status: rawStatus, wireguardConfig } = instanceDoc.data();
                 const status = normalizeVPNStatus(rawStatus);
                 if (status && status !== VPN_STATUS.TERMINATED) {
                     vpnData.push({
@@ -58,6 +59,7 @@ const getVPNs = async (userID: string, email: string | null): Promise<VPNData[]>
                         instanceID: instanceDoc.id,
                         ipv4: ipv4 || null,
                         status: status,
+                        wireguardConfig: wireguardConfig || null,
                     });
                 }
             });

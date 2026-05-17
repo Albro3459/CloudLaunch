@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
-import { ACTION, SecureGetWireguardConfigHelper, Targets, VPNdeployHelper } from "../helpers/APIHelper";
+import { ACTION, Targets, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, onAuthStateChanged } from "../firebase";
 import { getRegionName } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
@@ -165,29 +165,17 @@ const Home: React.FC = () => {
 
     // QR code functions
     
-    const handleQRcode = useCallback(async (IPv4: string, region: string | null) => {
-        if (!IPv4) {
-            setErrorMessage("Invalid IP address for QR code.");
-            console.error("Invalid IP address for QR code.");
+    const handleQRcode = useCallback((vpn: VPNTableEntry) => {
+        if (!vpn.ipv4 || !vpn.wireguardConfig) {
+            setErrorMessage("Config not available for QR code.");
+            console.error("Config not available for QR code.");
             return;
         }
 
-        setLoading(true);
-        setIP(IPv4); 
-        setVpnRegion(region);
-
-        const token = jwtToken || (await auth.currentUser?.getIdToken()) || "";
-        const result = await SecureGetWireguardConfigHelper(IPv4, token);
-
-        if (!result.success) {
-            setErrorMessage(result.error || "Failed to retrieve config for QR code.");
-            console.error("Failed to retrieve config for QR code.");
-        } else {
-            setConfigData(result.data?.wireguard_config || null);
-        }
-
-        setLoading(false);
-    }, [jwtToken]);
+        setIP(vpn.ipv4); 
+        setVpnRegion(vpn.region);
+        setConfigData(vpn.wireguardConfig);
+    }, []);
     
     
     const handleCreateNewAccount = () => {
