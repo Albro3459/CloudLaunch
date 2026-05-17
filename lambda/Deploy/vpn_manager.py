@@ -77,8 +77,8 @@ class OciSignedRestClient:
         self.host = f"{service}.{auth['region']}.oraclecloud.com"
         self.api_version = api_version
 
-    def get(self, path, params=None, raw_text=False):
-        return self._request("GET", path, params=params, raw_text=raw_text)
+    def get(self, path, params=None, raw_text=False, accept=None):
+        return self._request("GET", path, params=params, raw_text=raw_text, accept=accept)
 
     def post(self, path, payload):
         return self._request("POST", path, payload=payload)
@@ -86,7 +86,7 @@ class OciSignedRestClient:
     def delete(self, path, params=None):
         return self._request("DELETE", path, params=params)
 
-    def _request(self, method, path, params=None, payload=None, raw_text=False):
+    def _request(self, method, path, params=None, payload=None, raw_text=False, accept=None):
         target = f"/{self.api_version}{path}"
         if params:
             query = "&".join(
@@ -100,7 +100,7 @@ class OciSignedRestClient:
         url = f"https://{self.host}{target}"
         body = b""
         headers = {
-            "accept": "application/json",
+            "accept": accept or "application/json",
             "date": formatdate(timeval=None, localtime=False, usegmt=True),
             "host": self.host,
         }
@@ -173,8 +173,21 @@ class ResourceManagerClient:
     def get_job(self, job_id):
         return self.client.get(f"/jobs/{quote(job_id, safe='')}")
 
+    def get_job_logs_content(self, job_id):
+        return self.client.get(
+            f"/jobs/{quote(job_id, safe='')}/logs/content",
+            raw_text=True,
+            accept="text/plain; charset=utf-8",
+        )
+
     def get_job_tf_state(self, job_id):
         return self.client.get(f"/jobs/{quote(job_id, safe='')}/tfState", raw_text=True)
+
+    def get_stack_tf_state(self, stack_id):
+        return self.client.get(f"/stacks/{quote(stack_id, safe='')}/tfState", raw_text=True)
+
+    def delete_stack(self, stack_id):
+        return self.client.delete(f"/stacks/{quote(stack_id, safe='')}")
 
 
 class ComputeClient:
@@ -374,6 +387,63 @@ def _get_instance_ocid_from_state(tf_state):
 
     return None
 
+def _get_job_logs_tail(resource_manager_client, job_id, max_chars=3000):
+    try:
+        time.sleep(1)
+        logs = resource_manager_client.get_job_logs_content(job_id).data or ""
+    except Exception as exc:
+        return f"Unable to fetch job logs for {job_id}: {exc}"
+
+    logs = logs.strip()
+    if not logs:
+        return f"No job logs returned for {job_id}"
+    return logs[-max_chars:]
+
+def _state_has_resources(tf_state):
+    if tf_state.get("resources"):
+        return True
+    for module in tf_state.get("modules") or []:
+        if module.get("resources"):
+            return True
+    return False
+
+def _inspect_stack_state_for_cleanup(resource_manager_client, stack_id):
+    try:
+        tf_state_text = resource_manager_client.get_stack_tf_state(stack_id).data
+        if not tf_state_text:
+            return {
+                "ok": True,
+                "has_resources": False,
+                "instance_ocid": None,
+                "stack_absent": False,
+                "detail": "Stack Terraform state is empty",
+            }
+
+        tf_state = json.loads(tf_state_text)
+        return {
+            "ok": True,
+            "has_resources": _state_has_resources(tf_state),
+            "instance_ocid": _get_instance_ocid_from_state(tf_state),
+            "stack_absent": False,
+            "detail": "Stack Terraform state inspected",
+        }
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "ok": True,
+                "has_resources": False,
+                "instance_ocid": None,
+                "stack_absent": True,
+                "detail": "Stack already absent",
+            }
+        return {
+            "ok": False,
+            "has_resources": None,
+            "instance_ocid": None,
+            "stack_absent": False,
+            "detail": f"Unable to inspect Terraform state for stack {stack_id}: {exc}",
+        }
+
 def _get_instance_public_ip(compute_client, virtual_network_client, compartment_id, instance_id):
     deadline = time.time() + PUBLIC_IP_TIMEOUT_SECONDS
 
@@ -481,6 +551,27 @@ def _terminate_instance_directly(compute_client, instance_id):
             "detail": str(exc),
         }
 
+def _delete_stack_record(resource_manager_client, stack_id, detail):
+    try:
+        resource_manager_client.delete_stack(stack_id)
+        return {
+            "id": stack_id,
+            "status": "deleted",
+            "detail": detail,
+        }
+    except Exception as exc:
+        if _is_missing_resource_error(exc):
+            return {
+                "id": stack_id,
+                "status": "absent",
+                "detail": "Stack already absent",
+            }
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "detail": str(exc),
+        }
+
 
 def _destroy_stack(resource_manager_client, stack_id):
     try:
@@ -538,7 +629,10 @@ def _destroy_stack(resource_manager_client, stack_id):
         return {
             "id": stack_id,
             "status": "failed",
-            "detail": f"Destroy job {destroy_job.id} ended in state {job.lifecycle_state}",
+            "detail": (
+                f"Destroy job {destroy_job.id} ended in state {job.lifecycle_state}. "
+                f"Log tail: {_get_job_logs_tail(resource_manager_client, destroy_job.id)}"
+            ),
         }
     except Exception as exc:
         if _is_missing_resource_error(exc):
@@ -582,7 +676,10 @@ def deploy_instance(oci_config, vpn_config, user_id, oci_region):
         )
         apply_result = _wait_for_job(resource_manager_client, apply_job.id, JOB_TIMEOUT_SECONDS)
         if getattr(apply_result, "lifecycle_state", None) != "SUCCEEDED":
-            raise RuntimeError(f"OCI apply job failed with state {apply_result.lifecycle_state}")
+            raise RuntimeError(
+                f"OCI apply job {apply_job.id} failed with state {apply_result.lifecycle_state}. "
+                f"Log tail: {_get_job_logs_tail(resource_manager_client, apply_job.id)}"
+            )
 
         time.sleep(2)
         tf_state = json.loads(resource_manager_client.get_job_tf_state(apply_job.id).data)
@@ -625,8 +722,52 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
     resource_manager_client = clients["resource_manager"]
     compute_client = clients["compute"]
 
+    stack_state = None
+    if stack_id and not instance_ocid:
+        stack_state = _inspect_stack_state_for_cleanup(resource_manager_client, stack_id)
+        if not stack_state["ok"]:
+            return {
+                "ok": False,
+                "stack": {
+                    "id": stack_id,
+                    "status": "failed",
+                    "detail": stack_state["detail"],
+                },
+                "instance": {
+                    "id": None,
+                    "status": "skipped",
+                    "detail": "Skipped instance cleanup because stack state could not be inspected",
+                },
+            }
+
+        instance_ocid = stack_state["instance_ocid"]
+        if instance_ocid:
+            print(f"Recovered instance OCID {instance_ocid} from Terraform state for stack {stack_id}.")
+        elif stack_state.get("stack_absent"):
+            print(f"Stack {stack_id} already absent while inspecting Terraform state.")
+
     if stack_id:
-        stack_result = _destroy_stack(resource_manager_client, stack_id)
+        if instance_ocid:
+            stack_result = _destroy_stack(resource_manager_client, stack_id)
+        elif stack_state and stack_state.get("stack_absent"):
+            stack_result = {
+                "id": stack_id,
+                "status": "absent",
+                "detail": stack_state["detail"],
+            }
+        elif stack_state and stack_state["has_resources"]:
+            stack_result = {
+                "id": stack_id,
+                "status": "failed",
+                "detail": "Stack Terraform state has resources but no compute instance OCID; refusing to delete stack record",
+            }
+        else:
+            print(f"Deleting stack {stack_id} without destroy because no instance OCID was recorded or found.")
+            stack_result = _delete_stack_record(
+                resource_manager_client,
+                stack_id,
+                "Deleted stack record with no recorded or discoverable instance OCID",
+            )
     else:
         stack_result = {
             "id": None,
@@ -634,7 +775,7 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
             "detail": "No stack ID available",
         }
 
-    stack_cleanup_completed = stack_result["status"] in {"destroyed", "absent"}
+    stack_cleanup_completed = stack_result["status"] in {"destroyed", "deleted", "absent"}
 
     if instance_ocid:
         if stack_cleanup_completed:

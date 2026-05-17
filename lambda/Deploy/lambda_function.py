@@ -191,7 +191,7 @@ def lambda_handler(event, context):
                     try:
                         cleanup_result = terminate_instance_resources(
                             oci_config,
-                            oci_region,
+                            region,
                             stack_id=stack_id,
                             instance_ocid=instance_ocid,
                         )
@@ -206,12 +206,9 @@ def lambda_handler(event, context):
                             })
                             continue
 
-                        _record_cleanup_error_safely(
-                            uid,
-                            region,
-                            instance_id,
-                            _build_cleanup_error(instance_id, cleanup_result),
-                        )
+                        cleanup_error = _build_cleanup_error(instance_id, cleanup_result)
+                        print(cleanup_error)
+                        _record_cleanup_error_safely(uid, region, instance_id, cleanup_error)
                         errors.append({
                             "uid": uid,
                             "region": region,
