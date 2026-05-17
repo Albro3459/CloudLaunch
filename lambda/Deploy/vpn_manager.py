@@ -646,6 +646,60 @@ def _destroy_stack(resource_manager_client, stack_id):
         }
 
 
+def _is_stack_cleanup_completed(stack_result):
+    return stack_result["status"] in {"destroyed", "deleted", "absent"}
+
+
+def _cleanup_stack_after_direct_instance_termination(resource_manager_client, stack_id, initial_stack_result):
+    stack_state = _inspect_stack_associated_resources(resource_manager_client, stack_id)
+    if not stack_state["ok"]:
+        return {
+            "id": stack_id,
+            "status": "failed",
+            "detail": (
+                f"Initial stack cleanup failed: {initial_stack_result.get('detail')}. "
+                f"Unable to re-check stack resources after direct instance termination: {stack_state['detail']}"
+            ),
+        }
+
+    if stack_state.get("stack_absent"):
+        return {
+            "id": stack_id,
+            "status": "absent",
+            "detail": stack_state["detail"],
+        }
+
+    if not stack_state["has_resources"]:
+        delete_result = _delete_stack_record(
+            resource_manager_client,
+            stack_id,
+            "Deleted stack record after direct instance termination left no associated resources",
+        )
+        if _is_stack_cleanup_completed(delete_result):
+            return delete_result
+
+        return {
+            **delete_result,
+            "detail": (
+                f"Initial stack cleanup failed: {initial_stack_result.get('detail')}. "
+                f"Stack had no associated resources after direct instance termination, but delete failed: "
+                f"{delete_result.get('detail')}"
+            ),
+        }
+
+    retry_result = _destroy_stack(resource_manager_client, stack_id)
+    if _is_stack_cleanup_completed(retry_result):
+        return retry_result
+
+    return {
+        **retry_result,
+        "detail": (
+            f"Initial stack cleanup failed: {initial_stack_result.get('detail')}. "
+            f"Retry after direct instance termination failed: {retry_result.get('detail')}"
+        ),
+    }
+
+
 def _safe_mark_instance_failed(user_id, oci_region, stack_id, error_message):
     try:
         mark_instance_failed(user_id, oci_region, stack_id, error_message)
@@ -773,7 +827,7 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
             "detail": "No stack ID available",
         }
 
-    stack_cleanup_completed = stack_result["status"] in {"destroyed", "deleted", "absent"}
+    stack_cleanup_completed = _is_stack_cleanup_completed(stack_result)
 
     if instance_ocid:
         if stack_cleanup_completed:
@@ -786,6 +840,17 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
                 instance_result = _terminate_instance_directly(compute_client, instance_ocid)
         else:
             instance_result = _terminate_instance_directly(compute_client, instance_ocid)
+            if (
+                stack_id
+                and instance_result["status"] in {"absent", "terminated"}
+                and not stack_cleanup_completed
+            ):
+                stack_result = _cleanup_stack_after_direct_instance_termination(
+                    resource_manager_client,
+                    stack_id,
+                    stack_result,
+                )
+                stack_cleanup_completed = _is_stack_cleanup_completed(stack_result)
     else:
         instance_result = {
             "id": None,

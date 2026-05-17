@@ -1,5 +1,33 @@
 import { DEPLOY_URL, SECURE_GET_URL } from "../Secrets/API_URLs";
 
+const parseApiResponse = async (response: Response) => {
+    const responseText = await response.text();
+    if (!responseText) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(responseText);
+    } catch {
+        return responseText;
+    }
+};
+
+const getApiErrorMessage = (result: unknown, status: number) => {
+    if (result && typeof result === "object" && "error" in result) {
+        const error = (result as { error?: unknown }).error;
+        if (typeof error === "string" && error) {
+            return error;
+        }
+    }
+
+    if (typeof result === "string" && result) {
+        return result;
+    }
+
+    return `Error ${status}`;
+};
+
 export const SecureGetRegionsHelper = async (token: string) => {
     try {
         const myHeaders = new Headers();
@@ -16,12 +44,12 @@ export const SecureGetRegionsHelper = async (token: string) => {
         };
 
         const response = await fetch(SECURE_GET_URL, requestOptions);
-        const result = await response.json();
+        const result = await parseApiResponse(response);
 
         if (!response.ok) {
             return {
                 success: false,
-                error: result?.error || `Error ${response.status}`
+                error: getApiErrorMessage(result, response.status)
             };
         }
 
@@ -60,12 +88,12 @@ export const SecureGetWireguardConfigHelper = async (public_ipv4: string, token:
         };
 
         const response = await fetch(SECURE_GET_URL, requestOptions);
-        const result = await response.json();
+        const result = await parseApiResponse(response);
 
         if (!response.ok) {
             return {
                 success: false,
-                error: result?.error || `Error ${response.status}`
+                error: getApiErrorMessage(result, response.status)
             };
         }
 
@@ -116,12 +144,12 @@ export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, e
         };
 
         const response = await fetch(DEPLOY_URL, requestOptions);
-        const result = await response.json();
+        const result = await parseApiResponse(response);
 
         if (!response.ok) {
             return {
                 success: false,
-                error: result?.error || `Error ${response.status}`
+                error: getApiErrorMessage(result, response.status)
             };
         }
 
