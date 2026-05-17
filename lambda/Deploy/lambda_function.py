@@ -22,7 +22,7 @@ from get_secrets import (
     get_secret_value,
 )
 from notify import deliver_emails
-from config_helper import get_wireguard_config_options
+from config_helper import get_config, get_wireguard_config_options
 
 AWS_REGION = "us-west-1"
 
@@ -48,6 +48,24 @@ def _record_cleanup_error_safely(uid, region, instance_id, error_message):
         record_instance_cleanup_error(uid, region, instance_id, error_message)
     except Exception as e:
         print(f"Failed to persist cleanup error for {instance_id}: {e}")
+
+def _build_deploy_response(is_new, oci_region, oci_region_name, public_ipv4, client_private_key, server_public_key, wireguard_options):
+    return {
+        "isNew": is_new,
+        "region": {
+            "oci_region": oci_region,
+            "oci_region_name": oci_region_name,
+        },
+        "ip_addresses": {
+            "public_ipv4": public_ipv4,
+        },
+        "wireguard_config": get_config(
+            client_private_key,
+            server_public_key,
+            public_ipv4,
+            wireguard_options,
+        ),
+    }
 
 def lambda_handler(event, context):
     """
@@ -256,14 +274,15 @@ def lambda_handler(event, context):
             print(f"VPN {instance_ip} already exists in region {oci_region} for user {user_id}")
             return {
                 "statusCode": 200,
-                "body": json.dumps({
-                    "isNew": False,
-                    "public_ipv4": instance_ip,
-                    "client_private_key": client_private_key,
-                    "server_public_key": server_public_key,
-                    "region": oci_region,
-                    "region_name": oci_region_name,
-                })
+                "body": json.dumps(_build_deploy_response(
+                    False,
+                    oci_region,
+                    oci_region_name,
+                    instance_ip,
+                    client_private_key,
+                    server_public_key,
+                    wireguard_options,
+                ))
             }
 
         # Deploy the OCI instance through Resource Manager
@@ -301,14 +320,15 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": json.dumps({
-                "isNew": True,
-                "public_ipv4": public_ip,
-                "client_private_key": client_private_key,
-                "server_public_key": server_public_key,
-                "region": oci_region,
-                "region_name": oci_region_name,
-            })
+            "body": json.dumps(_build_deploy_response(
+                True,
+                oci_region,
+                oci_region_name,
+                public_ip,
+                client_private_key,
+                server_public_key,
+                wireguard_options,
+            ))
         }
     else:
         print(f"{action} is not a valid action")

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { generateConfig } from "../helpers/configHelper";
 import QRCode from "qrcode";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faHouse } from "@fortawesome/free-solid-svg-icons"; // Home icon
@@ -12,31 +11,23 @@ interface VPNSuccessState {
     region: string | null;
     isNew: boolean | null;
     ip: string | null;
-    client_private_key: string | null;
-    server_public_key: string | null;
-  }
+    wireguard_config: string | null;
+}
 
 const VPNSuccess: React.FC = () => {
     const navigate = useNavigate();
 
     const location = useLocation();
-    const { 
-        region,
-        isNew,
-        ip,
-        client_private_key, 
-        server_public_key
-    } = (location.state || {}) as Partial<VPNSuccessState>;
+    const { region, isNew, ip, wireguard_config } = (location.state || {}) satisfies Partial<VPNSuccessState>;
     
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
-        if (client_private_key && server_public_key && ip) {
-            const config = generateConfig(client_private_key, server_public_key, ip);
-            setConfigData(config);
+        if (wireguard_config) {
+            setConfigData(wireguard_config);
         }
-    }, [client_private_key, server_public_key, ip]);
+    }, [wireguard_config]);
 
     useEffect(() => {
         if (configData && canvasRef.current) {

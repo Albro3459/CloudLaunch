@@ -1,5 +1,6 @@
 import json
 
+from config_helper import get_config, get_wireguard_config_options
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
 from get_secrets import (
     OciSecretKey,
@@ -11,6 +12,7 @@ from get_secrets import (
 )
 
 AWS_REGION = "us-west-1"
+VALID_REQUESTS = {"region", "config"}
 
 def lambda_handler(event, context):
     """
@@ -29,14 +31,15 @@ def lambda_handler(event, context):
         }
 
     # Extract required values
-    requested_keys = body.get("requested_keys", [])
+    requested = (body.get("requested") or "").strip().lower()
+    ip_addresses = body.get("ip_addresses") or {}
 
     # Validate input
-    if not requested_keys or not isinstance(requested_keys, list):
-        print(f"Missing parameters: {requested_keys}")
+    if requested not in VALID_REQUESTS:
+        print(f"Missing or invalid request: {requested}")
         return {
             "statusCode": 400,
-            "body": json.dumps({"error": f"Missing parameters"})
+            "body": json.dumps({"error": "Missing or invalid request"})
         }
 
     # Fetch secrets
@@ -64,21 +67,48 @@ def lambda_handler(event, context):
     role = get_user_role(user_id)
     if not role: 
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
-    
-    
-    # Return allowed secret values
-    result = {}
-    for key in requested_keys:
-        if key == "client_private_key":
-            result[key] = get_secret_value(vpn_config, VpnSecretKey.CLIENT_PRIVATE_KEY)
-        elif key == "server_public_key":
-            result[key] = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
-        elif key == "oci_region":
-            result[key] = get_secret_value(oci_config, OciSecretKey.REGION)
-        elif key == "oci_region_name":
-            result[key] = get_secret_value(oci_config, OciSecretKey.REGION_NAME)
+
+    try:
+        if requested == "region":
+            result = {
+                "region": {
+                    "oci_region": get_secret_value(oci_config, OciSecretKey.REGION),
+                    "oci_region_name": get_secret_value(oci_config, OciSecretKey.REGION_NAME),
+                }
+            }
         else:
-            result[key] = None # Explicitly show unknown keys
+            if not isinstance(ip_addresses, dict):
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "Invalid ip_addresses"})
+                }
+
+            public_ipv4 = (ip_addresses.get("public_ipv4") or "").strip()
+            if not public_ipv4:
+                return {
+                    "statusCode": 400,
+                    "body": json.dumps({"error": "Missing public_ipv4"})
+                }
+
+            client_private_key = get_secret_value(vpn_config, VpnSecretKey.CLIENT_PRIVATE_KEY)
+            server_public_key = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
+            wireguard_options = get_wireguard_config_options(vpn_config)
+            result = {
+                "ip_addresses": {
+                    "public_ipv4": public_ipv4,
+                },
+                "wireguard_config": get_config(
+                    client_private_key,
+                    server_public_key,
+                    public_ipv4,
+                    wireguard_options,
+                ),
+            }
+    except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
+        }
 
     return {
         "statusCode": 200,

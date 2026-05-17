@@ -37,8 +37,8 @@ export const useOciRegionsStore = create<OciRegionsStore>((set) => ({
     const result = await SecureGetRegionsHelper(token);
 
     if (result?.success) {
-      const ociRegion = result.data?.oci_region;
-      const ociRegionName = result.data?.oci_region_name;
+      const ociRegion = result.data?.region?.oci_region;
+      const ociRegionName = result.data?.region?.oci_region_name;
       const fallbackRegion = oci_regions[0];
       const regions: Region[] = [{
         value: ociRegion || fallbackRegion.value,

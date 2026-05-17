@@ -1,6 +1,3 @@
-import qrcode
-from io import BytesIO
-
 from get_secrets import VpnSecretKey, get_secret_value
 
 def get_wireguard_config_options(secret_values):
@@ -39,18 +36,3 @@ Endpoint = {ip_address}:{listen_port}
 AllowedIPs = {allowed_ips_v4}, {allowed_ips_v6}
 PersistentKeepalive = {persistent_keepalive}
 """
-
-def build_QR_code(config_data):
-    # Returns bytes
-    print(f"Building QR Code.")
-    
-    qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    qr.add_data(config_data)
-    qr.make(fit=True)
-    
-    img = qr.make_image(fill_color='black', back_color='white')
-    buffer = BytesIO()
-    img.save(buffer, format='PNG')
-    buffer.seek(0)
-    
-    return buffer.read()

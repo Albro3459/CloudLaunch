@@ -6,9 +6,7 @@ export const SecureGetRegionsHelper = async (token: string) => {
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
-        const raw = JSON.stringify({
-            "requested_keys": ["oci_region", "oci_region_name"]
-        });
+        const raw = JSON.stringify({ "requested": "region" });
 
         const requestOptions: RequestInit = {
             method: "POST",
@@ -41,14 +39,17 @@ export const SecureGetRegionsHelper = async (token: string) => {
     }
 };
 
-export const SecureGetKeysHelper = async (requested_keys: string[], token: string) => {
+export const SecureGetWireguardConfigHelper = async (public_ipv4: string, token: string) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
         const raw = JSON.stringify({
-            "requested_keys": requested_keys
+            "requested": "config",
+            "ip_addresses": {
+                "public_ipv4": public_ipv4
+            }
         });
 
         const requestOptions: RequestInit = {
@@ -74,10 +75,10 @@ export const SecureGetKeysHelper = async (requested_keys: string[], token: strin
         };
         
     } catch (error) {
-        console.error("Secure Get Keys API Error:", error);
+        console.error("Secure Get Config API Error:", error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : "Unknown Secure Get Keys API Error"
+            error: error instanceof Error ? error.message : "Unknown Secure Get Config API Error"
         };
     }
 };

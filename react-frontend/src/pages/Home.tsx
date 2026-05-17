@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
-import { ACTION, Targets, VPNdeployHelper } from "../helpers/APIHelper";
+import { ACTION, SecureGetWireguardConfigHelper, Targets, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, onAuthStateChanged } from "../firebase";
 import { getRegionName } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
@@ -11,8 +11,6 @@ import { getUserRole } from "../helpers/usersHelper";
 import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
-import { generateConfig } from "../helpers/configHelper";
-import { fetchKeys, useKeyStore } from "../stores/keyStore";
 import { fetchOciRegions, useOciRegionsStore } from "../stores/ociRegionsStore";
 
 export enum TOGGLE {
@@ -36,7 +34,6 @@ const Home: React.FC = () => {
     const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[] | null>(null);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
     const [IP, setIP] = useState<string | null>(null);
-    const requestedKeys = useMemo(() => ['client_private_key', 'server_public_key'], []); // UseMemo to define once
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -59,11 +56,19 @@ const Home: React.FC = () => {
                     return;
                 }
 
-                const { isNew, public_ipv4, client_private_key, server_public_key, region_name } = response.data;
+                const { isNew, region: deployRegion, ip_addresses, wireguard_config } = response.data;
+                const publicIPv4 = ip_addresses?.public_ipv4 || "";
+                const ociRegion = deployRegion?.oci_region || region;
+                const ociRegionName = deployRegion?.oci_region_name || getRegionName(ociRegion, ociRegions);
 
                 navigate("/VPNSuccess", {
                     replace: true,
-                    state: { region: region_name || getRegionName(region, ociRegions), isNew: isNew, ip: public_ipv4, client_private_key: client_private_key, server_public_key: server_public_key }
+                    state: {
+                        region: ociRegionName,
+                        isNew: isNew,
+                        ip: publicIPv4,
+                        wireguard_config: wireguard_config
+                    }
                 });
             }
 
@@ -162,25 +167,18 @@ const Home: React.FC = () => {
         setIP(IPv4); 
         setVpnRegion(region);
 
-        let store = useKeyStore.getState();
-        if (!store.keys) {
-            await fetchKeys(requestedKeys, await auth.currentUser?.getIdToken() ?? ""); // If fetching, it can wait on the original fetch and get updated! WOOO
-            store = useKeyStore.getState();
-        }
+        const token = jwtToken || (await auth.currentUser?.getIdToken()) || "";
+        const result = await SecureGetWireguardConfigHelper(IPv4, token);
 
-        const clientKey = store.keys?.client_private_key || null;
-        const serverKey = store.keys?.server_public_key || null;
-
-        if (!clientKey || !serverKey) {
-            setErrorMessage("Failed to retrieve keys for QR code.");
-            console.error("Failed to retrieve keys for QR code.");
+        if (!result.success) {
+            setErrorMessage(result.error || "Failed to retrieve config for QR code.");
+            console.error("Failed to retrieve config for QR code.");
         } else {
-            const config = await generateConfig(clientKey, serverKey, IPv4);
-            setConfigData(config);
+            setConfigData(result.data?.wireguard_config || null);
         }
 
         setLoading(false);
-    }, [requestedKeys]);
+    }, [jwtToken]);
     
     
     const handleCreateNewAccount = () => {
@@ -231,7 +229,6 @@ const Home: React.FC = () => {
                     
                     setRole(await getUserRole(user));
                     
-                    void fetchKeys(requestedKeys, token); // Not awaiting         
                     void fetchOciRegions(token); // Not awaiting
                 } else {
                     await logout(navigate);
@@ -240,7 +237,7 @@ const Home: React.FC = () => {
             void fetchUserData();
         });
         return () => unsubscribe();
-    }, [navigate, fillVPNs, requestedKeys]);
+    }, [navigate, fillVPNs]);
 
     useEffect(() => {
         if (!region && ociRegions?.length) {
