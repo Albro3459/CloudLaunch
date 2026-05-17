@@ -181,10 +181,14 @@ class ResourceManagerClient:
         )
 
     def get_job_tf_state(self, job_id):
-        return self.client.get(f"/jobs/{quote(job_id, safe='')}/tfState", raw_text=True)
+        return self.client.get(
+            f"/jobs/{quote(job_id, safe='')}/tfState",
+            raw_text=True,
+            accept="application/octet-stream",
+        )
 
-    def get_stack_tf_state(self, stack_id):
-        return self.client.get(f"/stacks/{quote(stack_id, safe='')}/tfState", raw_text=True)
+    def list_stack_associated_resources(self, stack_id):
+        return self.client.get(f"/stacks/{quote(stack_id, safe='')}/associatedResources")
 
     def delete_stack(self, stack_id):
         return self.client.delete(f"/stacks/{quote(stack_id, safe='')}")
@@ -399,33 +403,26 @@ def _get_job_logs_tail(resource_manager_client, job_id, max_chars=3000):
         return f"No job logs returned for {job_id}"
     return logs[-max_chars:]
 
-def _state_has_resources(tf_state):
-    if tf_state.get("resources"):
-        return True
-    for module in tf_state.get("modules") or []:
-        if module.get("resources"):
-            return True
-    return False
-
-def _inspect_stack_state_for_cleanup(resource_manager_client, stack_id):
+def _inspect_stack_associated_resources(resource_manager_client, stack_id):
     try:
-        tf_state_text = resource_manager_client.get_stack_tf_state(stack_id).data
-        if not tf_state_text:
-            return {
-                "ok": True,
-                "has_resources": False,
-                "instance_ocid": None,
-                "stack_absent": False,
-                "detail": "Stack Terraform state is empty",
-            }
+        resources = resource_manager_client.list_stack_associated_resources(stack_id).data
+        # TODO: Follow OCI pagination if this stack starts managing more than the VPN instance.
+        items = list(getattr(resources, "items", None) or [])
+        instance_ocid = None
 
-        tf_state = json.loads(tf_state_text)
+        for resource in items:
+            resource_type = getattr(resource, "resource_type", None)
+            resource_id = getattr(resource, "resource_id", None)
+            if resource_type == "oci_core_instance" and resource_id:
+                instance_ocid = resource_id
+                break
+
         return {
             "ok": True,
-            "has_resources": _state_has_resources(tf_state),
-            "instance_ocid": _get_instance_ocid_from_state(tf_state),
+            "has_resources": bool(items),
+            "instance_ocid": instance_ocid,
             "stack_absent": False,
-            "detail": "Stack Terraform state inspected",
+            "detail": f"Stack associated resources inspected: {len(items)} found",
         }
     except Exception as exc:
         if _is_missing_resource_error(exc):
@@ -441,7 +438,7 @@ def _inspect_stack_state_for_cleanup(resource_manager_client, stack_id):
             "has_resources": None,
             "instance_ocid": None,
             "stack_absent": False,
-            "detail": f"Unable to inspect Terraform state for stack {stack_id}: {exc}",
+            "detail": f"Unable to inspect associated resources for stack {stack_id}: {exc}",
         }
 
 def _get_instance_public_ip(compute_client, virtual_network_client, compartment_id, instance_id):
@@ -724,7 +721,7 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
 
     stack_state = None
     if stack_id and not instance_ocid:
-        stack_state = _inspect_stack_state_for_cleanup(resource_manager_client, stack_id)
+        stack_state = _inspect_stack_associated_resources(resource_manager_client, stack_id)
         if not stack_state["ok"]:
             return {
                 "ok": False,
@@ -736,15 +733,15 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
                 "instance": {
                     "id": None,
                     "status": "skipped",
-                    "detail": "Skipped instance cleanup because stack state could not be inspected",
+                    "detail": "Skipped instance cleanup because stack associated resources could not be inspected",
                 },
             }
 
         instance_ocid = stack_state["instance_ocid"]
         if instance_ocid:
-            print(f"Recovered instance OCID {instance_ocid} from Terraform state for stack {stack_id}.")
+            print(f"Recovered instance OCID {instance_ocid} from associated resources for stack {stack_id}.")
         elif stack_state.get("stack_absent"):
-            print(f"Stack {stack_id} already absent while inspecting Terraform state.")
+            print(f"Stack {stack_id} already absent while inspecting associated resources.")
 
     if stack_id:
         if instance_ocid:
@@ -759,7 +756,7 @@ def terminate_instance_resources(auth_secret_values, oci_region, stack_id=None, 
             stack_result = {
                 "id": stack_id,
                 "status": "failed",
-                "detail": "Stack Terraform state has resources but no compute instance OCID; refusing to delete stack record",
+                "detail": "Stack has associated resources but no compute instance OCID; refusing to delete stack record",
             }
         else:
             print(f"Deleting stack {stack_id} without destroy because no instance OCID was recorded or found.")
