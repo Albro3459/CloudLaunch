@@ -2,6 +2,10 @@
 !**/Secrets/example.*
 !**/Secrets/*.example
 
+**/wireguard_configs/*
+!**/wireguard_configs/example.*
+!**/wireguard_configs/*.example
+
 **/output.css
 
 **/package-lock.json

@@ -168,11 +168,6 @@ if [[ -f /var/lib/unbound/root.key ]]; then
   chmod 640 /var/lib/unbound/root.key
 fi
 
-DNSSEC_CONFIG=""
-if [[ -f /var/lib/unbound/root.key ]]; then
-  DNSSEC_CONFIG=$'  auto-trust-anchor-file: "/var/lib/unbound/root.key"\n  harden-dnssec-stripped: yes'
-fi
-
 cat > /etc/unbound/unbound.conf.d/cloudlaunch-wireguard.conf <<UNBOUNDCONF
 server:
   interface: $WG_DNS_ADDRESS_V4
@@ -187,7 +182,6 @@ server:
   do-tcp: yes
   prefer-ip6: yes
   root-hints: "/usr/share/dns/root.hints"
-$${DNSSEC_CONFIG}
   qname-minimisation: yes
   hide-identity: yes
   hide-version: yes
