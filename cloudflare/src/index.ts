@@ -19,6 +19,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const WORKER_SECRET_HEADER = "x-cloudlaunch-worker-secret";
+const WORKER_RESPONSE_HEADER = "x-cloudlaunch-worker";
 
 type RoutePath = keyof typeof ROUTES;
 type EnvUrlKey = (typeof ROUTES)[RoutePath];
@@ -39,6 +40,7 @@ function getCorsHeaders(request: Request) {
 function withCors(response: Response, request: Request) {
   const headers = new Headers(response.headers);
   const corsHeaders = getCorsHeaders(request);
+  headers.set(WORKER_RESPONSE_HEADER, "cloudlaunch-api");
 
   for (const [headerName, headerValue] of Object.entries(corsHeaders)) {
     headers.set(headerName, headerValue);
@@ -109,10 +111,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     if (request.method === "OPTIONS") {
       return withCors(new Response(null, { status: 204 }), request);
-    }
-
-    if (!["GET", "POST"].includes(request.method)) {
-      return jsonResponse({ error: "Method not allowed" }, 405, request);
     }
 
     return proxyToLambda(request, env);
