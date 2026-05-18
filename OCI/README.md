@@ -75,10 +75,11 @@ The subnet OCID, source image OCID, availability domain, shape, boot volume sett
 [wireguard-cloud-init.sh.tftpl](terraform/wireguard-cloud-init.sh.tftpl)
 
 * Shell script template rendered by Terraform and run by cloud-init.
-* Installs WireGuard, `iptables`, and `fail2ban`.
+* Installs WireGuard, `iptables`, `fail2ban`, Unbound, and DNS blocklist refresh tooling.
 * Disables SSH password auth and root SSH login.
 * Enables IPv4 and IPv6 forwarding.
 * Writes `/etc/wireguard/<interface>.conf`.
+* Configures Unbound as the VPN DNS resolver with ad/tracker blocking.
 * Starts `wg-quick@<interface>`.
 * Writes step markers into `/var/log/wireguard-bootstrap.log` so bootstrap failures are easier to pinpoint.
 

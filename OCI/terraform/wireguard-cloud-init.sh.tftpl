@@ -40,7 +40,7 @@ echo "==> Step 1/8: Installing required packages"
 wait_for_apt
 apt-get update
 wait_for_apt
-apt-get install -y wireguard iptables fail2ban unbound dns-root-data
+apt-get install -y wireguard iptables fail2ban unbound dns-root-data curl
 systemctl stop unbound || true
 
 echo "==> Step 2/8: Preparing configuration directories"
@@ -50,6 +50,7 @@ install -d -m 755 /etc/sysctl.d
 install -d -m 755 /etc/ssh/sshd_config.d
 install -d -m 755 /etc/fail2ban/jail.d
 install -d -m 755 /etc/unbound/unbound.conf.d
+install -d -m 755 /etc/unbound/blocklists
 install -d -o unbound -g unbound -m 750 /var/lib/unbound
 
 echo "==> Step 3/8: Hardening SSH access"
@@ -185,10 +186,100 @@ server:
   qname-minimisation: yes
   hide-identity: yes
   hide-version: yes
+
+include: "/etc/unbound/blocklists/*.conf"
 UNBOUNDCONF
 
+cat > /usr/local/sbin/cloudlaunch-refresh-dns-blocklist <<'BLOCKSCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+BLOCKLIST_URL="https://big.oisd.nl/unbound"
+OUT="/etc/unbound/blocklists/cloudlaunch-adblock.conf"
+TMP="$(mktemp)"
+CANDIDATE_DIR="$(mktemp -d)"
+CANDIDATE_OUT="$CANDIDATE_DIR/cloudlaunch-adblock.conf"
+CANDIDATE_UNBOUND_CONF="$CANDIDATE_DIR/cloudlaunch-wireguard.conf"
+
+cleanup() {
+  rm -f "$TMP"
+  rm -rf "$CANDIDATE_DIR"
+}
+trap cleanup EXIT
+
+write_empty_blocklist() {
+  printf 'server:\n' > "$TMP"
+  install -m 644 "$TMP" "$OUT"
+}
+
+validate_candidate() {
+  install -m 644 "$TMP" "$CANDIDATE_OUT"
+  sed "s#/etc/unbound/blocklists/\\*.conf#$CANDIDATE_DIR/*.conf#" \
+    /etc/unbound/unbound.conf.d/cloudlaunch-wireguard.conf > "$CANDIDATE_UNBOUND_CONF"
+  unbound-checkconf "$CANDIDATE_UNBOUND_CONF"
+}
+
+if ! curl --connect-timeout 10 --max-time 60 --retry 2 --retry-delay 5 -fsSL "$BLOCKLIST_URL" -o "$TMP"; then
+  echo "Unable to download DNS blocklist from $BLOCKLIST_URL; leaving DNS ad blocking unchanged"
+  if [[ ! -f "$OUT" ]]; then
+    write_empty_blocklist
+  fi
+  exit 0
+fi
+
+if [[ ! -s "$TMP" ]]; then
+  echo "DNS blocklist from $BLOCKLIST_URL was empty; leaving DNS ad blocking unchanged"
+  if [[ ! -f "$OUT" ]]; then
+    write_empty_blocklist
+  fi
+  exit 0
+fi
+
+if ! validate_candidate; then
+  echo "DNS blocklist from $BLOCKLIST_URL failed Unbound validation; leaving DNS ad blocking unchanged"
+  if [[ ! -f "$OUT" ]]; then
+    write_empty_blocklist
+  fi
+  exit 0
+fi
+
+install -m 644 "$TMP" "$OUT"
+
+if systemctl is-active --quiet unbound; then
+  systemctl reload unbound || systemctl restart unbound
+fi
+BLOCKSCRIPT
+
+chmod 755 /usr/local/sbin/cloudlaunch-refresh-dns-blocklist
+
+cat > /etc/systemd/system/cloudlaunch-dns-blocklist.service <<'SERVICE'
+[Unit]
+Description=Refresh CloudLaunch DNS ad and tracker blocklist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cloudlaunch-refresh-dns-blocklist
+SERVICE
+
+cat > /etc/systemd/system/cloudlaunch-dns-blocklist.timer <<'TIMER'
+[Unit]
+Description=Refresh CloudLaunch DNS ad and tracker blocklist daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+systemctl daemon-reload
+/usr/local/sbin/cloudlaunch-refresh-dns-blocklist
 unbound-checkconf
 systemctl enable unbound
+systemctl enable --now cloudlaunch-dns-blocklist.timer
 
 echo "==> Step 8/8: Starting WireGuard and unbound"
 # Start Wireguard
