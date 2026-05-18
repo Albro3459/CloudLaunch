@@ -2,6 +2,10 @@
 !**/Secrets/example.*
 !**/Secrets/*.example
 
+**/*.vars
+!**/*.vars.example
+!**/example.vars.*
+
 **/wireguard_configs/*
 !**/wireguard_configs/example.*
 !**/wireguard_configs/*.example

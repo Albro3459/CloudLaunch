@@ -6,11 +6,19 @@ cd CloudLaunch;
 npm install
 ```
 
-Run project on local:
+Run the Cloudflare Worker in one terminal:
+```sh
+cd cloudflare
+npm run dev
+```
+
+Run the React app in another terminal:
 ```sh
 cd react-frontend; 
 npm start
 ````
+
+`npm start` sets `REACT_APP_API_ORIGIN=http://localhost:8787`, so local API calls go to the Worker instead of the React dev server. Production builds leave this unset and use same-origin `/api/*` paths on `gocloudlaunch.com`.
 
 Keep tailwind css updated while making changes:
 ```sh
