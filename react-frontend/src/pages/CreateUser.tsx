@@ -79,7 +79,7 @@ const CreateUser: React.FC = () => {
                 if (result.success) {
                     setSuccessMessage(`Created user: ${trimmedEmail}`);
                     setEmail(""); setPassword(""); setConfirmPassword("");
-                    navigate("/CreateUserSuccess", {
+                    navigate("/create-user-success", {
                         replace: true,
                         state: { email: trimmedEmail, password: password }
                     });

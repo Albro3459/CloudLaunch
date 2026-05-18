@@ -6,7 +6,6 @@ import VPNSuccess from "./pages/VPNSuccess";
 import About from "./pages/About";
 import CreateUser from "./pages/CreateUser";
 import CreateUserSuccess from "./pages/CreateUserSuccess";
-import StreamTrackerPrivacyPolicy from "./pages/StreamTrackerPrivacyPolicy";
 import PasswordReset from "./pages/PasswordReset";
 
 const App: React.FC = () => {
@@ -17,12 +16,10 @@ const App: React.FC = () => {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth" element={<PasswordReset />} />
-        <Route path="/vpnSuccess" element={<VPNSuccess />} />
+        <Route path="/vpn-success" element={<VPNSuccess />} />
         <Route path="/about" element={<About />} />
-        <Route path="/createUser" element={<CreateUser />} />
-        <Route path="/createUserSuccess" element={<CreateUserSuccess />} />
-        
-        <Route path="/StreamTrackerPrivacyPolicy" element={<StreamTrackerPrivacyPolicy />} />
+        <Route path="/create-user" element={<CreateUser />} />
+        <Route path="/create-user-success" element={<CreateUserSuccess />} />
       </Routes>
     </Router>
   );

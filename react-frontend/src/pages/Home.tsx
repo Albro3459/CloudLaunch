@@ -64,7 +64,7 @@ const Home: React.FC = () => {
                 const ociRegion = deployRegion?.oci_region || region;
                 const ociRegionName = deployRegion?.oci_region_name || getRegionName(ociRegion, ociRegions);
 
-                navigate("/VPNSuccess", {
+                navigate("/vpn-success", {
                     replace: true,
                     state: {
                         region: ociRegionName,
@@ -180,7 +180,7 @@ const Home: React.FC = () => {
     
     const handleCreateNewAccount = () => {
         if (role === "admin") {
-            navigate("/CreateUser", { replace: true });
+            navigate("/create-user", { replace: true });
         }
     }
 
