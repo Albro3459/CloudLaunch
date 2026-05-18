@@ -1,4 +1,5 @@
 import json
+import os
 import boto3
 
 from vpn_manager import deploy_instance, terminate_instance_resources
@@ -29,10 +30,26 @@ from vpn_status import VPNStatus, normalize_vpn_status
 AWS_REGION = "us-west-1"
 
 VALID_ACTIONS = {"deploy", "terminate"}
+WORKER_SECRET_HEADER = "x-cloudlaunch-worker-secret"
+WORKER_SECRET_ENV = "CLOUDLAUNCH_WORKER_SECRET"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
 role_table = dynamodb.Table("vpn-roles")
+
+
+def _get_header(headers, name, default=""):
+    target = name.lower()
+    for header_name, header_value in headers.items():
+        if header_name.lower() == target:
+            return header_value
+    return default
+
+
+def _worker_secret_is_valid(headers):
+    expected_secret = os.environ.get(WORKER_SECRET_ENV, "")
+    provided_secret = _get_header(headers, WORKER_SECRET_HEADER, "")
+    return bool(expected_secret) and provided_secret == expected_secret
 
 
 def _build_cleanup_error(instance_id, cleanup_result):
@@ -94,7 +111,10 @@ def lambda_handler(event, context):
     Token is extracted from the 'Authorization' header
     """
     headers = event.get("headers", {})
-    auth_header = headers.get("Authorization", headers.get("authorization", "")).strip() # AWS is case-sensitive
+    if not _worker_secret_is_valid(headers):
+        return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
+
+    auth_header = _get_header(headers, "Authorization", "").strip()
     token = auth_header.replace("Bearer ", "")
 
     try:

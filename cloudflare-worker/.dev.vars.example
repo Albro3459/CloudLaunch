@@ -1,0 +1,4 @@
+DEPLOY_URL="https://deploy-function-url.lambda-url.us-west-1.on.aws/"
+SECURE_GET_URL="https://secureget-function-url.lambda-url.us-west-1.on.aws/"
+CREATE_USER_URL="https://createuser-function-url.lambda-url.us-west-1.on.aws/"
+CLOUDLAUNCH_WORKER_SECRET="replace-with-a-long-random-value"
