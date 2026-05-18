@@ -8,9 +8,13 @@ SECRET_NAME = "CloudLaunch"
 
 class SecretSection(StrEnum):
     AWS = "aws"
+    CLOUDFLARE = "cloudflare"
     FIREBASE = "firebase"
     OCI = "oci"
     VPN = "vpn"
+
+class CloudflareSecretKey(StrEnum):
+    WORKER_SECRET = "CLOUDLAUNCH_WORKER_SECRET"
 
 class AwsSecretKey(StrEnum):
     SES_SENDER = "SES_SENDER"

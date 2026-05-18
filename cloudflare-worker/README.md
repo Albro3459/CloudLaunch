@@ -44,7 +44,7 @@ npx wrangler secret put CREATE_USER_URL
 npx wrangler secret put CLOUDLAUNCH_WORKER_SECRET
 ```
 
-Use the same `CLOUDLAUNCH_WORKER_SECRET` value as an environment variable on the `Deploy`, `SecureGet`, and `CreateUser` AWS Lambdas.
+Use the same `CLOUDLAUNCH_WORKER_SECRET` value in the `cloudflare` block of the `CloudLaunch` AWS Secrets Manager payload used by the `Deploy`, `SecureGet`, and `CreateUser` AWS Lambdas.
 
 ## Deploy
 

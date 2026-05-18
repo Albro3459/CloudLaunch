@@ -1,4 +1,4 @@
-import { DEPLOY_URL, SECURE_GET_URL } from "../Secrets/API_URLs";
+import { DEPLOY_API_PATH, SECURE_GET_API_PATH } from "./apiEndpoints";
 
 const parseApiResponse = async (response: Response) => {
     const responseText = await response.text();
@@ -43,7 +43,7 @@ export const SecureGetRegionsHelper = async (token: string) => {
             redirect: "follow"
         };
 
-        const response = await fetch(SECURE_GET_URL, requestOptions);
+        const response = await fetch(SECURE_GET_API_PATH, requestOptions);
         const result = await parseApiResponse(response);
 
         if (!response.ok) {
@@ -87,7 +87,7 @@ export const SecureGetWireguardConfigHelper = async (public_ipv4: string, token:
             redirect: "follow"
         };
 
-        const response = await fetch(SECURE_GET_URL, requestOptions);
+        const response = await fetch(SECURE_GET_API_PATH, requestOptions);
         const result = await parseApiResponse(response);
 
         if (!response.ok) {
@@ -143,7 +143,7 @@ export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, e
             redirect: "follow"
         };
 
-        const response = await fetch(DEPLOY_URL, requestOptions);
+        const response = await fetch(DEPLOY_API_PATH, requestOptions);
         const result = await parseApiResponse(response);
 
         if (!response.ok) {

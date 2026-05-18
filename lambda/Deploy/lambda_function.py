@@ -1,5 +1,4 @@
 import json
-import os
 import boto3
 
 from vpn_manager import deploy_instance, terminate_instance_resources
@@ -16,6 +15,7 @@ from firebase import (
 )
 from get_secrets import (
     AwsSecretKey,
+    CloudflareSecretKey,
     OciSecretKey,
     SecretSection,
     VpnSecretKey,
@@ -31,7 +31,6 @@ AWS_REGION = "us-west-1"
 
 VALID_ACTIONS = {"deploy", "terminate"}
 WORKER_SECRET_HEADER = "x-cloudlaunch-worker-secret"
-WORKER_SECRET_ENV = "CLOUDLAUNCH_WORKER_SECRET"
 
 dynamodb = boto3.resource("dynamodb")
 user_table = dynamodb.Table("vpn-users")
@@ -46,8 +45,7 @@ def _get_header(headers, name, default=""):
     return default
 
 
-def _worker_secret_is_valid(headers):
-    expected_secret = os.environ.get(WORKER_SECRET_ENV, "")
+def _worker_secret_is_valid(headers, expected_secret):
     provided_secret = _get_header(headers, WORKER_SECRET_HEADER, "")
     return bool(expected_secret) and provided_secret == expected_secret
 
@@ -111,7 +109,24 @@ def lambda_handler(event, context):
     Token is extracted from the 'Authorization' header
     """
     headers = event.get("headers", {})
-    if not _worker_secret_is_valid(headers):
+
+    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
+    if not cloudlaunch_secret:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
+        }
+
+    try:
+        cloudflare_config = get_secret_section(cloudlaunch_secret, SecretSection.CLOUDFLARE)
+        worker_secret = get_secret_value(cloudflare_config, CloudflareSecretKey.WORKER_SECRET)
+    except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
+        }
+
+    if not _worker_secret_is_valid(headers, worker_secret):
         return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
 
     auth_header = _get_header(headers, "Authorization", "").strip()
@@ -153,13 +168,6 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": f"Missing or invalid action"})
         }        
         
-    # Fetch secrets
-    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
-    if not cloudlaunch_secret:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
-        }
     try:
         aws_config = get_secret_section(cloudlaunch_secret, SecretSection.AWS)
         firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)

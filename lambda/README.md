@@ -24,7 +24,7 @@ Keep AWS SES email and the Admin email in AWS  the complete Firebase service-acc
   * Storage: 512 mb
   * Timeout: 1 min 
 
-Set the same `CLOUDLAUNCH_WORKER_SECRET` environment variable on `CreateUser`, `Deploy`, and `SecureGet`. The Cloudflare Worker sends this value in the `x-cloudlaunch-worker-secret` header, and each Lambda rejects direct requests that do not include it.
+Set `cloudflare.CLOUDLAUNCH_WORKER_SECRET` in the `CloudLaunch` AWS Secrets Manager payload. The Cloudflare Worker stores the same value as a Cloudflare secret, sends it in the `x-cloudlaunch-worker-secret` header, and each Lambda rejects direct requests that do not include it.
 
 ## OCI Deployment Flow
 

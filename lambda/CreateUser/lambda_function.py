@@ -1,15 +1,19 @@
 import json
-import os
 from firebase_admin import auth, firestore
 
 from firebase import initialize_firebase, verify_firebase_token, get_user_role
-from get_secrets import SecretSection, get_cloudlaunch_secret, get_secret_section
+from get_secrets import (
+    CloudflareSecretKey,
+    SecretSection,
+    get_cloudlaunch_secret,
+    get_secret_section,
+    get_secret_value,
+)
 
 AWS_REGION = "us-west-1"
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 4096
 WORKER_SECRET_HEADER = "x-cloudlaunch-worker-secret"
-WORKER_SECRET_ENV = "CLOUDLAUNCH_WORKER_SECRET"
 
 
 def _get_header(headers, name, default=""):
@@ -20,8 +24,7 @@ def _get_header(headers, name, default=""):
     return default
 
 
-def _worker_secret_is_valid(headers):
-    expected_secret = os.environ.get(WORKER_SECRET_ENV, "")
+def _worker_secret_is_valid(headers, expected_secret):
     provided_secret = _get_header(headers, WORKER_SECRET_HEADER, "")
     return bool(expected_secret) and provided_secret == expected_secret
 
@@ -67,7 +70,24 @@ def lambda_handler(event, context):
     Creates new user with a user role
     """
     headers = event.get("headers", {})
-    if not _worker_secret_is_valid(headers):
+
+    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
+    if not cloudlaunch_secret:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+        }
+
+    try:
+        cloudflare_config = get_secret_section(cloudlaunch_secret, SecretSection.CLOUDFLARE)
+        worker_secret = get_secret_value(cloudflare_config, CloudflareSecretKey.WORKER_SECRET)
+    except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
+        }
+
+    if not _worker_secret_is_valid(headers, worker_secret):
         return {"statusCode": 403, "body": json.dumps({"error": "Forbidden"})}
 
     auth_header = _get_header(headers, "Authorization", "").strip()
@@ -102,13 +122,6 @@ def lambda_handler(event, context):
             "body": json.dumps({"error": password_error})
         }
 
-    # Fetch secrets
-    cloudlaunch_secret = get_cloudlaunch_secret(AWS_REGION)
-    if not cloudlaunch_secret:
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
-        }
     try:
         firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
     except ValueError as e:

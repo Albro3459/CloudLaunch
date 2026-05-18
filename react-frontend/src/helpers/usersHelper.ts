@@ -1,6 +1,6 @@
 import { User } from "firebase/auth";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
-import { CREATE_USER_URL } from "../Secrets/API_URLs";
+import { CREATE_USER_API_PATH } from "./apiEndpoints";
 
 export const createUser = async (email: string, password: string, token: string) => {
     try {
@@ -20,7 +20,7 @@ export const createUser = async (email: string, password: string, token: string)
             redirect: "follow"
         };
 
-        const response = await fetch(CREATE_USER_URL, requestOptions);
+        const response = await fetch(CREATE_USER_API_PATH, requestOptions);
         const result = await response.json();
 
         if (!response.ok) {
