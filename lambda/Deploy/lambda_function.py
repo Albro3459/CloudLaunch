@@ -153,6 +153,7 @@ def lambda_handler(event, context):
     
         # Deploy params (Required for Deploy)
     email = (body.get("email") or "").strip()
+    override_existing_vpn = body.get("override_existing_vpn") is True
 
     # Validate input
     if not token:
@@ -307,7 +308,7 @@ def lambda_handler(event, context):
         
         # Make sure there are no active instances in the region for that user.
         vpn = get_user_instances_in_region(user_id, role, oci_region)
-        if vpn:
+        if vpn and not (role == "admin" and override_existing_vpn):
             existing_instances = [
                 instance
                 for instances in vpn.values()

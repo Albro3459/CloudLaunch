@@ -123,7 +123,7 @@ export enum ACTION {
     TERMINATE = "terminate"
 }
 
-export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, email: string | null, target_region: string | null, token: string) => {
+export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, email: string | null, target_region: string | null, token: string, overrideExistingVpn = false) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
@@ -134,6 +134,7 @@ export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, e
             "targets": targets,
             "email" : email,
             "target_region": target_region,
+            "override_existing_vpn": overrideExistingVpn,
         });
 
         const requestOptions: RequestInit = {

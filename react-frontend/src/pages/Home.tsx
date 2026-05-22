@@ -12,7 +12,7 @@ import { VPNTable, VPNTableEntry } from "../components/VPNTable";
 import { getUsersVPNs, logout, VPNData } from "../helpers/firebaseDbHelper";
 import { User } from "firebase/auth";
 import { fetchOciRegions, useOciRegionsStore } from "../stores/ociRegionsStore";
-import { normalizeVPNStatus } from "../helpers/vpnStatus";
+import { normalizeVPNStatus, VPN_STATUS } from "../helpers/vpnStatus";
 
 export enum TOGGLE {
     ADD,
@@ -37,9 +37,37 @@ const Home: React.FC = () => {
     const [IP, setIP] = useState<string | null>(null);
     const [configData, setConfigData] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [showDeployOverrideConfirm, setShowDeployOverrideConfirm] = useState(false);
+    const [overrideDeployChecked, setOverrideDeployChecked] = useState(false);
+    const [existingDeployEntry, setExistingDeployEntry] = useState<VPNTableEntry | null>(null);
 
-    const handleDeploySubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const navigateToExistingVPN = useCallback((vpn: VPNTableEntry) => {
+        const ociRegionName = getRegionName(vpn.region, ociRegions);
+
+        navigate("/vpn-success", {
+            replace: true,
+            state: {
+                region: ociRegionName,
+                isNew: false,
+                status: vpn.status,
+                ip: vpn.ipv4 || "",
+                wireguard_config: vpn.wireguardConfig
+            }
+        });
+    }, [navigate, ociRegions]);
+
+    const getCurrentUserActiveVPN = useCallback(() => {
+        const currentUserId = auth.currentUser?.uid;
+        if (!currentUserId || !VPNTableEntries) return null;
+
+        return VPNTableEntries.find(vpn => (
+            vpn.userID === currentUserId &&
+            vpn.region === region &&
+            (vpn.status === VPN_STATUS.RUNNING || vpn.status === VPN_STATUS.PENDING)
+        )) || null;
+    }, [VPNTableEntries, region]);
+
+    const deployVPN = async (overrideExistingVpn = false) => {
         setLoading(true);
         
         try {
@@ -48,7 +76,7 @@ const Home: React.FC = () => {
                 console.error("Error: JWT token not found");
             }
             else {
-                const response = await VPNdeployHelper(ACTION.DEPLOY, null, auth.currentUser?.email || "", region, jwtToken);
+                const response = await VPNdeployHelper(ACTION.DEPLOY, null, auth.currentUser?.email || "", region, jwtToken, overrideExistingVpn);
 
                 if (!response.success) {
                     setErrorMessage(response.error || "Something went wrong");
@@ -85,6 +113,40 @@ const Home: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDeploySubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (VPNTableEntries === null) {
+            setErrorMessage("VPN instances are still loading");
+            return;
+        }
+
+        const activeVPN = getCurrentUserActiveVPN();
+        if (activeVPN) {
+            if (role === "admin") {
+                setExistingDeployEntry(activeVPN);
+                setOverrideDeployChecked(false);
+                setShowDeployOverrideConfirm(true);
+                return;
+            }
+
+            if (activeVPN.status === VPN_STATUS.RUNNING) {
+                if (activeVPN.wireguardConfig) {
+                    navigateToExistingVPN(activeVPN);
+                    return;
+                }
+
+                await deployVPN();
+                return;
+            }
+
+            setErrorMessage("A VPN deployment is already in progress");
+            return;
+        }
+
+        await deployVPN();
     };
 
     // Terminate Action
@@ -311,9 +373,9 @@ const Home: React.FC = () => {
                 {/* Submit Button */}
                 <button
                     type="submit"
-                    disabled={!region}
+                    disabled={!region || VPNTableEntries === null}
                     className={`w-full p-3 rounded-lg transition ${
-                    region 
+                    region && VPNTableEntries !== null
                         ? "cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-gray-400 text-gray-200 cursor-not-allowed"
                     }`}
@@ -332,6 +394,66 @@ const Home: React.FC = () => {
                 actionFunc={handleTerminate}
                 onQRCodeClick={handleQRcode}
             />
+
+            {showDeployOverrideConfirm && existingDeployEntry && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white p-6 rounded-2xl shadow-lg max-w-md w-full">
+                        <h3 className="text-xl font-semibold mb-3">Existing VPN Found</h3>
+                        <p className="text-sm text-gray-700 mb-4">
+                            You already have an active VPN in <b>{getRegionName(existingDeployEntry.region, ociRegions)}</b>.
+                            To deploy another one, confirm the admin override.
+                        </p>
+                        <label className="flex items-start gap-3 text-sm text-gray-700 mb-6">
+                            <input
+                                type="checkbox"
+                                checked={overrideDeployChecked}
+                                onChange={(e) => setOverrideDeployChecked(e.target.checked)}
+                                className="mt-1"
+                            />
+                            <span>I understand this will deploy another VPN instead of using the existing one.</span>
+                        </label>
+                        <div className="flex flex-col sm:flex-row justify-end gap-3">
+                            {existingDeployEntry.status === VPN_STATUS.RUNNING && (
+                                <button
+                                    onClick={async () => {
+                                        setShowDeployOverrideConfirm(false);
+                                        if (existingDeployEntry.wireguardConfig) {
+                                            navigateToExistingVPN(existingDeployEntry);
+                                            return;
+                                        }
+
+                                        await deployVPN();
+                                    }}
+                                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+                                >
+                                    Use Existing
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setShowDeployOverrideConfirm(false)}
+                                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!overrideDeployChecked) return;
+                                    setShowDeployOverrideConfirm(false);
+                                    await deployVPN(true);
+                                }}
+                                disabled={!overrideDeployChecked}
+                                className={`px-4 py-2 rounded-lg transition ${
+                                    overrideDeployChecked
+                                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                                        : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                }`}
+                            >
+                                Deploy Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* QR code overlay with download button */}
             {configData && (
