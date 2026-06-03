@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { oci_regions, Region } from '../helpers/regionsHelper';
+import { Region } from '../helpers/regionsHelper';
 import { SecureGetRegionsHelper } from '../helpers/APIHelper';
 
 interface OciRegionsStore {
@@ -11,6 +11,56 @@ interface OciRegionsStore {
 }
 
 let activeFetch: Promise<void> | null = null;
+
+type SecureGetRegion = {
+  oci_region?: unknown;
+  oci_region_name?: unknown;
+  enabled?: unknown;
+  capacity?: {
+    limit?: unknown;
+    active?: unknown;
+    available?: unknown;
+  };
+};
+
+const parseCapacity = (capacity: SecureGetRegion["capacity"]) => {
+  if (!capacity || typeof capacity !== "object") return undefined;
+
+  const limit = Number(capacity.limit);
+  const active = Number(capacity.active);
+  const available = Number(capacity.available);
+
+  if (![limit, active, available].every(Number.isFinite)) {
+    return undefined;
+  }
+
+  return { limit, active, available };
+};
+
+const parseRegionsResponse = (data: unknown): Region[] | null => {
+  if (!data || typeof data !== "object") return null;
+
+  const regions = (data as { regions?: unknown }).regions;
+  if (!Array.isArray(regions)) return null;
+
+  const parsedRegions = regions.reduce<Region[]>((result, item) => {
+    const region = item as SecureGetRegion;
+    if (typeof region.oci_region !== "string" || typeof region.oci_region_name !== "string") {
+      return result;
+    }
+
+    result.push({
+      value: region.oci_region,
+      name: region.oci_region_name,
+      enabled: region.enabled !== false,
+      capacity: parseCapacity(region.capacity),
+    });
+
+    return result;
+  }, []);
+
+  return parsedRegions.length ? parsedRegions : null;
+};
 
 export const fetchOciRegions = async (token: string) : Promise<void> => {
   const store = useOciRegionsStore.getState();
@@ -37,13 +87,11 @@ export const useOciRegionsStore = create<OciRegionsStore>((set) => ({
     const result = await SecureGetRegionsHelper(token);
 
     if (result?.success) {
-      const ociRegion = result.data?.region?.oci_region;
-      const ociRegionName = result.data?.region?.oci_region_name;
-      const fallbackRegion = oci_regions[0];
-      const regions: Region[] = [{
-        value: ociRegion || fallbackRegion.value,
-        name: ociRegionName || fallbackRegion.name
-      }];
+      const regions = parseRegionsResponse(result.data);
+      if (!regions) {
+        set({ error: 'Invalid regions response', loading: false });
+        return;
+      }
 
       set({ ociRegions: regions, loading: false });
     } else {
