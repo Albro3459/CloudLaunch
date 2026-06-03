@@ -4,6 +4,7 @@ import boto3
 from vpn_manager import deploy_instance, terminate_instance_resources
 from role_manager import get_max_count_for_role, get_user_vpn_count, increment_user_count
 from firebase import (
+    get_active_instance_count_for_region,
     get_instance,
     get_user_instances_in_region,
     initialize_firebase,
@@ -20,6 +21,7 @@ from get_secrets import (
     SecretSection,
     VpnSecretKey,
     get_cloudlaunch_secret,
+    get_oci_region_config,
     get_secret_section,
     get_secret_value,
 )
@@ -153,6 +155,7 @@ def lambda_handler(event, context):
     
         # Deploy params (Required for Deploy)
     email = (body.get("email") or "").strip()
+    requested_region = (body.get("region") or "").strip()
     override_existing_vpn = body.get("override_existing_vpn") is True
 
     # Validate input
@@ -172,7 +175,7 @@ def lambda_handler(event, context):
     try:
         aws_config = get_secret_section(cloudlaunch_secret, SecretSection.AWS)
         firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
-        oci_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
+        oci_root_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
         vpn_config = get_secret_section(cloudlaunch_secret, SecretSection.VPN)
     except ValueError as e:
         return {
@@ -185,8 +188,6 @@ def lambda_handler(event, context):
         server_public_key = get_secret_value(vpn_config, VpnSecretKey.SERVER_PUBLIC_KEY)
         sender = get_secret_value(aws_config, AwsSecretKey.SES_SENDER)
         admin_email = get_secret_value(aws_config, AwsSecretKey.ADMIN_EMAIL)
-        oci_region = get_secret_value(oci_config, OciSecretKey.REGION)
-        oci_region_name = get_secret_value(oci_config, OciSecretKey.REGION_NAME)
     except ValueError as e:
         return {
             "statusCode": 500,
@@ -240,7 +241,7 @@ def lambda_handler(event, context):
 
                     try:
                         cleanup_result = terminate_instance_resources(
-                            oci_config,
+                            oci_root_config,
                             region,
                             stack_id=stack_id,
                             instance_ocid=instance_ocid,
@@ -299,6 +300,22 @@ def lambda_handler(event, context):
         }
         
     elif action.lower() == "deploy":
+        if not requested_region:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required region"})
+            }
+
+        try:
+            oci_region = requested_region
+            oci_region_config = get_oci_region_config(oci_root_config, oci_region)
+            oci_region_name = get_secret_value(oci_region_config, OciSecretKey.REGION_NAME)
+        except ValueError as e:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": str(e)})
+            }
+
         if not email:
             print(f"Missing required parameters: {email}")
             return {
@@ -370,10 +387,39 @@ def lambda_handler(event, context):
         vpn_role_max_count = get_max_count_for_role(role, role_table)
         if user_vpn_count >= vpn_role_max_count:
             return {"statusCode": 403, "body": json.dumps({"error": "User's VPN limit reached"})}
+
+        region_limit = oci_region_config.get("region_limit")
+        try:
+            region_limit = int(region_limit)
+        except (TypeError, ValueError):
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": f"Invalid region_limit for {oci_region}"})
+            }
+
+        try:
+            region_active_count = get_active_instance_count_for_region(oci_region)
+        except RuntimeError as e:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"error": str(e)})
+            }
+
+        if region_active_count >= region_limit:
+            return {
+                "statusCode": 403,
+                "body": json.dumps({
+                    "error": "Region capacity reached",
+                    "region": oci_region,
+                    "limit": region_limit,
+                    "active": region_active_count,
+                })
+            }
+
         increment_user_count(user_id, user_table)
 
         # Deploy the OCI instance through Resource Manager
-        result = deploy_instance(oci_config, vpn_config, user_id, oci_region)
+        result = deploy_instance(oci_region_config, vpn_config, user_id, oci_region)
         if result["error"]:
             return {
                 "statusCode": 500,

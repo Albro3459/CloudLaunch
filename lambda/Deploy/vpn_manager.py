@@ -273,7 +273,7 @@ def _build_display_name(user_id):
     normalized_user_id = _normalize_name(user_id)
     return f"VPN-{normalized_user_id}-{timestamp}"
 
-def _build_stack_variables(oci_config, vpn_config, instance_name):
+def _build_stack_variables(oci_config, vpn_config, instance_name, oci_region):
     ssh_authorized_keys = oci_config.get(OciSecretKey.SSH_AUTHORIZED_KEYS_JSON.value)
     if isinstance(ssh_authorized_keys, str):
         ssh_authorized_keys = json.loads(ssh_authorized_keys)
@@ -282,7 +282,7 @@ def _build_stack_variables(oci_config, vpn_config, instance_name):
 
     variables = {
         "availability_domain": get_secret_value(oci_config, OciSecretKey.AVAILABILITY_DOMAIN),
-        "region": get_secret_value(oci_config, OciSecretKey.REGION),
+        "region": oci_region,
         "compartment_id": get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
         "subnet_id": get_secret_value(oci_config, OciSecretKey.SUBNET_ID),
         "source_image_id": get_secret_value(oci_config, OciSecretKey.SOURCE_IMAGE_ID),
@@ -341,7 +341,7 @@ def _wait_for_job(resource_manager_client, job_id, timeout_seconds):
 
     raise TimeoutError(f"Timed out waiting for job {job_id} to finish")
 
-def _create_stack(resource_manager_client, oci_config, vpn_config, user_id):
+def _create_stack(resource_manager_client, oci_config, vpn_config, user_id, oci_region):
     stack_name = _build_display_name(user_id)
     stack_details = {
         "compartmentId": get_secret_value(oci_config, OciSecretKey.COMPARTMENT_ID),
@@ -351,7 +351,7 @@ def _create_stack(resource_manager_client, oci_config, vpn_config, user_id):
             "configSourceType": "ZIP_UPLOAD",
             "zipFileBase64Encoded": _zip_terraform_package(),
         },
-        "variables": _build_stack_variables(oci_config, vpn_config, stack_name),
+        "variables": _build_stack_variables(oci_config, vpn_config, stack_name, oci_region),
         "freeformTags": {
             "managed-by": "cloudlaunch",
             "vpn-user-id": user_id,
@@ -791,7 +791,7 @@ def deploy_instance(oci_config, vpn_config, user_id, oci_region):
         compute_client = clients["compute"]
         virtual_network_client = clients["virtual_network"]
 
-        stack = _create_stack(resource_manager_client, oci_config, vpn_config, user_id)
+        stack = _create_stack(resource_manager_client, oci_config, vpn_config, user_id, oci_region)
         upsert_stack_backed_instance_record(user_id, oci_region, stack.id, stack.display_name)
 
         apply_job = _create_job(
