@@ -30,7 +30,7 @@ const parseCapacity = (capacity: SecureGetRegion["capacity"]) => {
   const active = Number(capacity.active);
   const available = Number(capacity.available);
 
-  if (![limit, active, available].every(Number.isFinite)) {
+  if (![limit, active, available].every((x) => Number.isSafeInteger(x) && x >= 0)) {
     return undefined;
   }
 
@@ -62,10 +62,10 @@ const parseRegionsResponse = (data: unknown): Region[] | null => {
   return parsedRegions.length ? parsedRegions : null;
 };
 
-export const fetchOciRegions = async (token: string) : Promise<void> => {
+export const fetchOciRegions = async (token: string, force = false) : Promise<void> => {
   const store = useOciRegionsStore.getState();
   if (activeFetch) return activeFetch;
-  if (store.loading || store.ociRegions?.length) return;
+  if (!force && (store.loading || store.ociRegions?.length)) return;
   
   activeFetch = store.fetchOciRegions(token);
 

@@ -90,6 +90,7 @@ const Home: React.FC = () => {
                     const responseData = response.data;
                     if (responseData?.error === "Region capacity reached" && typeof responseData.region === "string") {
                         setErrorMessage(`${getRegionName(responseData.region, ociRegions)} is currently full. Choose another region.`);
+                        await fetchOciRegions(jwtToken, true);
                     } else {
                         setErrorMessage(response.error || "Something went wrong");
                     }
@@ -104,6 +105,8 @@ const Home: React.FC = () => {
                 const publicIPv4 = ip_addresses?.public_ipv4 || "";
                 const ociRegion = deployRegion?.oci_region || region;
                 const ociRegionName = deployRegion?.oci_region_name || getRegionName(ociRegion, ociRegions);
+
+                void fetchOciRegions(jwtToken, true);
 
                 navigate("/vpn-success", {
                     replace: true,
@@ -234,7 +237,10 @@ const Home: React.FC = () => {
                 setTargets({});
 
                 if (auth.currentUser) {
-                    await fillVPNs(auth.currentUser);
+                    await Promise.all([
+                        fillVPNs(auth.currentUser),
+                        fetchOciRegions(jwtToken, true),
+                    ]);
                 }
             }
 
