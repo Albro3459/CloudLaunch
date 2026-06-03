@@ -221,6 +221,39 @@ def lambda_handler(event, context):
 
         print(f"User {user_id}: terminating {targets}")
 
+        oci_region_configs = {}
+        invalid_regions = []
+        for uid, regions in targets.items():
+            if not isinstance(regions, dict):
+                invalid_regions.append({
+                    "uid": uid,
+                    "region": None,
+                    "error": "Invalid target regions",
+                })
+                continue
+
+            for region in regions:
+                if region in oci_region_configs:
+                    continue
+
+                try:
+                    oci_region_configs[region] = get_oci_region_config(oci_root_config, region)
+                except ValueError as e:
+                    invalid_regions.append({
+                        "uid": uid,
+                        "region": region,
+                        "error": str(e),
+                    })
+
+        if invalid_regions:
+            return {
+                "statusCode": 400,
+                "body": json.dumps({
+                    "error": "Invalid termination target region",
+                    "details": invalid_regions,
+                })
+            }
+
         terminated_targets = []
         errors = []
         for uid, regions in targets.items():
@@ -241,7 +274,7 @@ def lambda_handler(event, context):
 
                     try:
                         cleanup_result = terminate_instance_resources(
-                            oci_root_config,
+                            oci_region_configs[region],
                             region,
                             stack_id=stack_id,
                             instance_ocid=instance_ocid,
