@@ -1,5 +1,5 @@
 export const oci_regions: Region[] = [
-    { name: "San Jose", value: "us-sanjose-1" },
+    { name: "California", value: "us-sanjose-1" },
 ];
 
 export type Region = {

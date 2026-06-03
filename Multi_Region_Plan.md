@@ -103,10 +103,9 @@ Replace the current single `oci` object with a region map.
     "regions": {
       "us-sanjose-1": {
         "enabled": true,
-        "display_name": "San Jose",
         "region_limit": 3,
 
-        "OCI_REGION_NAME": "San Jose",
+        "OCI_REGION_NAME": "California",
 
         "OCI_USER_OCID": "ocid1.user.oc1..aaaa...",
         "OCI_TENANCY_OCID": "ocid1.tenancy.oc1..aaaa...",
@@ -130,10 +129,9 @@ Replace the current single `oci` object with a region map.
       },
       "us-ashburn-1": {
         "enabled": true,
-        "display_name": "Ashburn",
         "region_limit": 4,
 
-        "OCI_REGION_NAME": "Ashburn",
+        "OCI_REGION_NAME": "Virginia",
 
         "OCI_USER_OCID": "ocid1.user.oc1..bbbb...",
         "OCI_TENANCY_OCID": "ocid1.tenancy.oc1..bbbb...",
@@ -242,7 +240,7 @@ def get_oci_region_config(oci_section: dict, region: str) -> dict:
     return region_config
 ```
 
-Why the mismatch check matters: it prevents accidentally mapping `us-ashburn-1` to a San Jose subnet or San Jose tenancy credentials.
+Why the mismatch check matters: it prevents accidentally mapping `us-ashburn-1` to a California subnet or California tenancy credentials.
 
 ## 5. `Deploy` Lambda changes
 
@@ -431,7 +429,7 @@ cleanup_result = terminate_instance_resources(
 )
 ```
 
-This is mandatory. Otherwise an Ashburn termination could be signed with San Jose tenancy credentials and fail.
+This is mandatory. Otherwise an Virginia termination could be signed with California tenancy credentials and fail.
 
 ## 6. `SecureGet` Lambda changes
 
@@ -462,7 +460,7 @@ Response:
   "regions": [
     {
       "oci_region": "us-sanjose-1",
-      "oci_region_name": "San Jose",
+      "oci_region_name": "California",
       "enabled": true,
       "capacity": {
         "limit": 3,
@@ -472,7 +470,7 @@ Response:
     },
     {
       "oci_region": "us-ashburn-1",
-      "oci_region_name": "Ashburn",
+      "oci_region_name": "Virginia",
       "enabled": true,
       "capacity": {
         "limit": 4,
@@ -600,8 +598,8 @@ Frontend -> render region selector
 Example display:
 
 ```text
-San Jose      2 / 3 used
-Ashburn       1 / 4 used
+California      2 / 3 used
+Virginia       1 / 4 used
 ```
 
 Disable region if:
@@ -672,7 +670,7 @@ Add UI handling for:
 The last one should show a plain message like:
 
 ```text
-San Jose is currently full. Choose another region.
+California is currently full. Choose another region.
 ```
 
 ## 9. Terraform changes
@@ -828,9 +826,9 @@ OCI_BOOT_VOLUME_VPUS_PER_GB
 
 ### 8. Make sure quotas/capacity match your Firebase/AWS configured limit
 
-If San Jose is limited to 3, make sure the OCI account can actually run 3 of your selected shape.
+If California is limited to 3, make sure the OCI account can actually run 3 of your selected shape.
 
-If Ashburn is limited to 4, make sure that account can actually run 4.
+If Virginia is limited to 4, make sure that account can actually run 4.
 
 Your app-level region limit prevents CloudLaunch from over-requesting, but OCI quota can still reject you earlier if the tenancy does not have capacity.
 
@@ -859,8 +857,8 @@ to:
 }
 ```
 
-2. Add San Jose only first.
-3. Do not add Ashburn until San Jose works with the new schema.
+2. Add California only first.
+3. Do not add Virginia until California works with the new schema.
 
 ### Phase 2: Backend helper changes
 
@@ -900,15 +898,15 @@ to:
 
 ### Phase 6: Add second OCI account
 
-1. Set up Ashburn OCI account.
+1. Set up Virginia OCI account.
 2. Add automation user/API key.
 3. Add policies.
 4. Create/select compartment, subnet, image, AD.
 5. Add `us-ashburn-1` to AWS secret.
 6. Test SecureGet regions response.
-7. Test deploy to Ashburn.
-8. Test terminate from Ashburn.
-9. Confirm San Jose still works.
+7. Test deploy to Virginia.
+8. Test terminate from Virginia.
+9. Confirm California still works.
 
 ## 13. Expected code touch list
 

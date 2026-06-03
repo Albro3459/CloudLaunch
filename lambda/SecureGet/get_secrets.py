@@ -62,6 +62,41 @@ def get_secret_section(secret_values: dict, section: SecretSection):
         return value
     raise ValueError(f"Missing required secret section: {section.value}")
 
+def get_oci_regions(oci_section: dict) -> dict:
+    regions = (oci_section or {}).get("regions")
+    if not isinstance(regions, dict) or not regions:
+        raise ValueError("Missing required secret value: oci.regions")
+
+    for region, region_config in regions.items():
+        if not isinstance(region, str) or not region.strip():
+            raise ValueError("Invalid OCI region key")
+        if region != region.strip():
+            raise ValueError(f"Invalid OCI region key: {region}")
+        if not isinstance(region_config, dict) or not region_config:
+            raise ValueError(f"Missing OCI region config: {region}")
+        if OciSecretKey.REGION.value in region_config:
+            raise ValueError(
+                f"Do not set {OciSecretKey.REGION.value} inside oci.regions.{region}; "
+                "the region key is the source of truth"
+            )
+
+    return regions
+
+def get_oci_region_config(oci_section: dict, region: str) -> dict:
+    requested_region = (region or "").strip()
+    if not requested_region:
+        raise ValueError("Missing required region")
+
+    regions = get_oci_regions(oci_section)
+    region_config = regions.get(requested_region)
+    if not isinstance(region_config, dict) or not region_config:
+        raise ValueError(f"Unsupported OCI region: {requested_region}")
+
+    if region_config.get("enabled") is False:
+        raise ValueError(f"OCI region is disabled: {requested_region}")
+
+    return region_config
+
 def get_secret_value(secret_values: dict, key: StrEnum):
     value = (secret_values or {}).get(key.value)
     if value not in (None, ""):
