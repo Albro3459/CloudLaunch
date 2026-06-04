@@ -11,7 +11,7 @@
 
  * Instantly deploy a secure <b>WireGuard VPN</b>, pre-configured with IPv4, IPv6, and DNS.
 
- * The deployment flow is being migrated from AWS EC2/AMI provisioning to Oracle Cloud Infrastructure stacks managed by <b>AWS Lambda</b>.
+ * Deployments run through <b>AWS Lambda</b> and Oracle Cloud Infrastructure stacks, with selectable OCI regions backed by separate OCI account configs.
 
  * Generate your VPN configuration instantly, scan a QR code, or download the <b>.conf</b> file for easy setup on your devices. All in just a few clicks.
 

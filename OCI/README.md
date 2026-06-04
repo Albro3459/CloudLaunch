@@ -2,27 +2,17 @@
 
 This folder contains the Oracle Cloud Infrastructure Terraform package used to launch a WireGuard VPN instance with cloud-init bootstrap scripts.
 
-AWS Lambda is the orchestrator. The `Deploy` Lambda signs direct HTTPS requests to OCI Resource Manager, uploads this Terraform package as a stack, creates apply/destroy jobs, and reads Compute/VNIC data after the job finishes. OCI Terraform creates the WireGuard instance.
+CloudLaunch uses this model:
 
-The Terraform [cloudlaunch.tf](terraform/cloudlaunch.tf) creates the compute instance only. It assumes the compartment, subnet, IPv6 setup, route tables, and security rules already exist.
+```text
+1 selectable OCI region = 1 OCI account / tenancy config
+```
 
-If you want to create another VPN without replacing the instance tracked by the current stack, use the separate package in [terraform-additional](terraform-additional). Upload that directory as a different OCI stack so it gets its own Terraform state.
+AWS Lambda is the orchestrator. The `Deploy` Lambda receives a selected region, reads that region's account config from `CloudLaunch.oci.regions.<region>`, signs direct HTTPS requests to OCI Resource Manager, uploads this Terraform package as a stack, creates apply/destroy jobs, and reads Compute/VNIC data after the job finishes.
 
-## OCI Automation User
+The Terraform [cloudlaunch.tf](terraform/cloudlaunch.tf) creates the compute instance only. It assumes the compartment, subnet, IPv6 setup, route tables, and security rules already exist in the selected OCI account.
 
-Create a dedicated OCI user for CloudLaunch automation.
-
-1. Create an OCI group such as `CloudLaunchAutomation`.
-2. Create an automation user and add it to that group.
-3. Generate an API signing key pair for the user.
-4. Upload the public key to the user's API keys.
-5. Update the AWS `CloudLaunch` secrets
-  * See what is required in the `oci` object in [CloudLaunch.example](../lambda/secrets/CloudLaunch.example)
-
-Use an unencrypted PEM private key. 
-
-**NOTE:**
-The Lambda stores and signs from the Secrets Manager value directly. It does not read a local OCI config file.
+Runtime Lambda deploys do not use `terraform.tfvars`. The Lambda sends stack variables from the selected AWS Secrets Manager region config.
 
 ## OCI Policies
 
@@ -49,7 +39,7 @@ Tune names and scope to your tenancy. If the subnet, image, or network resources
 
 ## Network Prerequisites
 
-Before the Lambda creates a stack, make sure OCI already has:
+Before the Lambda creates a stack in a region/account, make sure OCI already has:
 
 * a target compartment
 * a subnet for the instance
@@ -61,7 +51,7 @@ Before the Lambda creates a stack, make sure OCI already has:
   * IPv6: `::/0`
 * egress that allows VPN client traffic out to `0.0.0.0/0` and `::/0`
 
-The subnet OCID, source image OCID, availability domain, shape, boot volume settings, and IPv6 subnet CIDR belong in `CloudLaunch.oci`.
+The subnet OCID, source image OCID, availability domain, shape, boot volume settings, and IPv6 subnet CIDR belong in the matching `CloudLaunch.oci.regions.<region>` entry.
 
 ## Files
 
@@ -91,26 +81,20 @@ The subnet OCID, source image OCID, availability domain, shape, boot volume sett
 
 [terraform.tfvars.example](terraform/terraform.tfvars.example)
 
-* Example values for all required Terraform inputs.
-* Use this as the template when creating or updating your real `terraform.tfvars`.
+* Manual stack testing example only.
+* Runtime Lambda deploy values come from the selected `CloudLaunch.oci.regions.<region>` entry.
+* Use this only when testing the Terraform package directly outside the Lambda flow.
 
 [terraform.tfvars](terraform/terraform.tfvars)
 
-* Real stack values for this environment.
+* Optional local-only manual testing file.
 * Contains sensitive values such as the WireGuard private key and password hash.
-* If you package this file into the stack zip, those values become part of the uploaded stack artifact.
 
 [.terraform.lock.hcl](terraform/.terraform.lock.hcl)
 
 * Terraform dependency lock file.
 * Useful for local reproducibility.
-* Not required in the zip you upload to OCI Stacks.
-
-[terraform-additional](terraform-additional)
-
-* Separate standalone Terraform package for creating another VPN instance in a different OCI stack.
-* Intended for parallel instances so you do not replace the one managed by [terraform](terraform).
-* Starts with different example display names and WireGuard address ranges so you have a safer baseline when cloning a second VPN.
+* Not required in the zip uploaded by the Lambda flow.
 
 ## Backdoor User
 
@@ -126,7 +110,7 @@ What it does:
 How to use it:
 
 1. Open the OCI instance.
-2. Go to the console connection / Cloud Shell style serial login flow.
+2. Go to the console connection / serial login flow.
 3. Log in as `backdoor` with the password that matches the `hashed_password` Terraform input.
 
 This user is for recovery only.
@@ -134,34 +118,32 @@ This user is for recovery only.
 ## Local Validation
 
 ```sh
-cd terraform &&
-terraform init &&
+cd terraform
+terraform init
 terraform validate
 ```
 
 What these do:
 
-* `terraform init` downloads the OCI provider and prepares the local working directory
-* `terraform validate` checks Terraform syntax, type usage, and provider schema compatibility
+* `terraform init` downloads the OCI provider and prepares the local working directory.
+* `terraform validate` checks Terraform syntax, type usage, and provider schema compatibility.
 
 Useful notes:
 
-* `.terraform/` is local init output and should not be committed
-* `terraform validate` requires `terraform init` first on a clean machine
-* if you change provider-related settings later, rerun `terraform init`
+* `.terraform/` is local init output and should not be committed.
+* `terraform validate` requires `terraform init` first on a clean machine.
+* If you change provider-related settings later, rerun `terraform init`.
 
-## Creating Or Updating The OCI Stack
+## Manual Stack Testing
 
 For the Lambda flow, [lambda/Deploy/build_deploy_lambda.sh](../lambda/Deploy/build_deploy_lambda.sh) copies the Terraform files into the Lambda package, and the Lambda uploads them to Resource Manager as a zip-backed config source.
 
-If you manually upload to OCI Stacks, zip only the files Resource Manager actually needs.
-
-Include:
+If you manually upload to OCI Stacks, zip only the files Resource Manager actually needs:
 
 * [cloudlaunch.tf](terraform/cloudlaunch.tf)
 * [wireguard-cloud-init.sh.tftpl](terraform/wireguard-cloud-init.sh.tftpl)
 * [backdoor-cloud-init.yaml](terraform/backdoor-cloud-init.yaml)
-* [terraform.tfvars](terraform/terraform.tfvars)
+* `terraform.tfvars` only if you are intentionally testing with local manual values
 
 Do not include:
 
@@ -207,7 +189,7 @@ After the instance launches, useful logs on the VM are:
 * `/var/log/cloud-init-output.log`
 * `/var/log/wireguard-bootstrap.log`
 
-Check with 
+Check with:
 ```sh
 sudo sed -n '1,240p' /var/log/wireguard-bootstrap.log
 # or

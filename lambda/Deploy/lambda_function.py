@@ -237,7 +237,7 @@ def lambda_handler(event, context):
                     continue
 
                 try:
-                    oci_region_configs[region] = get_oci_region_config(oci_root_config, region)
+                    oci_region_configs[region] = get_oci_region_config(oci_root_config, region, allow_disabled=True)
                 except ValueError as e:
                     invalid_regions.append({
                         "uid": uid,

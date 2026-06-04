@@ -113,7 +113,7 @@ def get_oci_regions(oci_section: dict) -> dict:
 
     return regions
 
-def get_oci_region_config(oci_section: dict, region: str) -> dict:
+def get_oci_region_config(oci_section: dict, region: str, allow_disabled=False) -> dict:
     requested_region = (region or "").strip()
     if not requested_region:
         raise ValueError("Missing required region")
@@ -123,7 +123,7 @@ def get_oci_region_config(oci_section: dict, region: str) -> dict:
     if not isinstance(region_config, dict) or not region_config:
         raise ValueError(f"Unsupported OCI region: {requested_region}")
 
-    if region_config.get("enabled") is False:
+    if region_config.get("enabled") is False and not allow_disabled:
         raise ValueError(f"OCI region is disabled: {requested_region}")
 
     return region_config

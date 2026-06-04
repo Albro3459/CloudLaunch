@@ -312,7 +312,7 @@ const Home: React.FC = () => {
                     
                     setRole(await getUserRole(user));
                     
-                    void fetchOciRegions(token); // Not awaiting
+                    void fetchOciRegions(token, true); // Not awaiting
                 } else {
                     await logout(navigate);
                 }

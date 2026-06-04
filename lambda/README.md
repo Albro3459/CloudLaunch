@@ -6,15 +6,32 @@ This folder contains the AWS Lambda functions that authenticate users, read the 
 
 Create one AWS Secrets Manager secret named `CloudLaunch`. Use [CloudLaunch.example](secrets/CloudLaunch.example) as the payload template.
 
-The secret has four top-level objects: aws, firebase, oci, vpn
+The secret has five top-level objects:
+* `aws`
+* `cloudflare`
+* `firebase`
+* `oci`
+* `vpn`
 
-Keep AWS SES email and the Admin email in AWS  the complete Firebase service-account JSON in `firebase`, all OCI API signing and Terraform values in `oci`, and WireGuard runtime values in `vpn`.
+Keep AWS SES email values in `aws`, the Cloudflare worker shared secret in `cloudflare`, the complete Firebase service-account JSON in `firebase`, OCI account and Terraform runtime values in `oci.regions.<region>`, and WireGuard runtime values in `vpn`.
+
+`oci.regions` is a map keyed by the OCI region code, such as `us-sanjose-1` or `us-ashburn-1`. One region entry represents one OCI account or tenancy configuration.
+
+Each region entry should include:
+* `enabled`: `true` to allow new deploys, `false` to hide the region from SecureGet and reject new deploys.
+* `region_limit`: app-level maximum active VPNs for that region. This cap applies to admins too.
+* `OCI_REGION_NAME`: display name returned to the frontend.
+* OCI API signing values: user OCID, tenancy OCID, fingerprint, and private key.
+* Terraform runtime values: compartment, availability domain, subnet, source image, shape, boot volume, SSH keys, password hash, and IPv6 subnet CIDR.
+
+Keep disabled region configs in the secret until all existing VPNs in that region are terminated. Admin termination can still use a disabled region's stored account config for cleanup.
 
 ## Configuration
+
 * CreateUser:
   * Memory: 512 mb (speeds up cold starts)
   * Storage: 512 mb
-  * Timeout: 1 min 
+  * Timeout: 1 min
 * Deploy:
   * Memory: 512 mb (256 minimum)
   * Storage: 512 mb
@@ -22,13 +39,59 @@ Keep AWS SES email and the Admin email in AWS  the complete Firebase service-acc
 * SecureGet:
   * Memory: 512 mb (speeds up cold starts)
   * Storage: 512 mb
-  * Timeout: 1 min 
+  * Timeout: 1 min
 
 Set `cloudflare.CLOUDLAUNCH_WORKER_SECRET` in the `CloudLaunch` AWS Secrets Manager payload. The Cloudflare Worker stores the same value as a Cloudflare secret, sends it in the `x-cloudlaunch-worker-secret` header, and each Lambda rejects direct requests that do not include it.
 
+## Deploy Flow
+
+Deploy requests must include a `region` field. There is no default region.
+
+For deploy actions, the `Deploy` Lambda:
+
+1. Reads `CloudLaunch.oci.regions.<region>`.
+2. Rejects missing, unsupported, or disabled regions.
+3. Verifies the Firebase token and reads the user's role.
+4. Checks for an existing active VPN for that user in the selected region.
+5. Checks the DynamoDB user-level role limit.
+6. Counts active Firebase VPN records in the selected region and rejects when `region_limit` is reached.
+7. Creates an OCI Resource Manager stack using the selected region account config.
+8. Saves stack, instance, status, IP, and WireGuard config data to Firebase.
+9. Emails the generated WireGuard config.
+
+For terminate actions, the request keeps the existing admin target map. Each target region is resolved to its own `oci.regions.<region>` config before cleanup, including disabled regions.
+
+## SecureGet Flow
+
+SecureGet supports:
+
+* `requested: "regions"`: returns public region discovery and capacity.
+* `requested: "config"`: returns a WireGuard client config for a known public IPv4 address.
+
+The region list response includes only public-safe fields:
+
+```json
+{
+  "regions": [
+    {
+      "oci_region": "us-sanjose-1",
+      "oci_region_name": "California",
+      "enabled": true,
+      "capacity": {
+        "limit": 3,
+        "active": 2,
+        "available": 1
+      }
+    }
+  ]
+}
+```
+
+SecureGet omits disabled regions from the public list and never returns OCI credentials, infrastructure OCIDs, Firebase credentials, password hashes, SSH keys, or WireGuard private keys.
+
 ## OCI Deployment Flow
 
-The `Deploy` Lambda does not import the Python `oci` SDK. It signs direct HTTPS requests with the API key values from `CloudLaunch.oci`.
+The `Deploy` Lambda does not import the Python `oci` SDK. It signs direct HTTPS requests with the API key values from the selected `CloudLaunch.oci.regions.<region>` entry.
 
 The Lambda calls these OCI APIs:
 
@@ -52,7 +115,7 @@ Firebase and OCI are reached over HTTPS by the Lambda runtime. There is no AWS S
 
 ## Lambda Egress
 
-The `Deploy` Lambda must reach public OCI endpoints for Resource Manager and Compute/Virtual Network.
+The `Deploy` Lambda must reach public OCI endpoints for Resource Manager and Compute/Virtual Network in every enabled region.
 
 * No VPC: Lambda runs in the Lambda-managed network and has normal outbound internet access.
 * VPC private subnets, IPv4: route `0.0.0.0/0` from the private subnet route table to a NAT gateway in a public subnet.
@@ -114,37 +177,56 @@ For the `Deploy` Lambda, `publish.sh` runs [build_deploy_lambda.sh](Deploy/build
 Before testing, confirm:
 
 * `CloudLaunch` exists and matches [CloudLaunch.example](secrets/CloudLaunch.example).
+* Each enabled `oci.regions.<region>` entry has a valid OCI account config and realistic `region_limit`.
 * The current shared layer is attached to the Lambda functions.
 * The Lambda execution role has the IAM permissions above.
 * Lambda egress can reach OCI public API endpoints on HTTPS.
 * OCI has the automation user, API key, policies, compartment, subnet, image, and security rules described in [OCI/README.md](../OCI/README.md).
-* The updated `Deploy` Lambda code package has been uploaded.
+* The updated Lambda code packages have been uploaded.
 
-In the AWS Console, test `Deploy` with a real Firebase bearer token and a body like:
+In the AWS Console, test SecureGet region discovery with a real Firebase bearer token and the worker secret:
 
 ```json
 {
   "headers": {
-    "Authorization": "Bearer <firebase-id-token>"
+    "Authorization": "Bearer <firebase-id-token>",
+    "x-cloudlaunch-worker-secret": "<worker-secret>"
   },
-  "body": "{\"action\":\"deploy\",\"email\":\"user@example.com\"}"
+  "body": "{\"requested\":\"regions\"}"
 }
 ```
 
-Expected result: the function creates an OCI Resource Manager stack, applies it, records the stack and instance OCIDs in Firebase, resolves the public IPv4 address from the instance VNIC, and sends the SES email.
+Expected result: SecureGet returns a `regions` array with public display names and capacity counts only.
 
-Test termination with an admin Firebase bearer token and a target map like:
+Test `Deploy` with a selected region:
 
 ```json
 {
   "headers": {
-    "Authorization": "Bearer <admin-firebase-id-token>"
+    "Authorization": "Bearer <firebase-id-token>",
+    "x-cloudlaunch-worker-secret": "<worker-secret>"
+  },
+  "body": "{\"action\":\"deploy\",\"email\":\"user@example.com\",\"region\":\"us-sanjose-1\"}"
+}
+```
+
+Expected result: the function creates an OCI Resource Manager stack in the selected region account, applies it, records the stack and instance OCIDs in Firebase, resolves the public IPv4 address from the instance VNIC, and sends the SES email.
+
+Test termination with an admin Firebase bearer token and a target map:
+
+```json
+{
+  "headers": {
+    "Authorization": "Bearer <admin-firebase-id-token>",
+    "x-cloudlaunch-worker-secret": "<worker-secret>"
   },
   "body": "{\"action\":\"terminate\",\"targets\":{\"<uid>\":{\"us-sanjose-1\":[\"<stack-ocid>\"]}}}"
 }
 ```
 
-Expected result: the function runs an OCI Resource Manager destroy job, directly terminates the compute instance if stack cleanup does not finish it, and marks the Firebase record terminated.
+Expected result: the function selects the target region account config, runs an OCI Resource Manager destroy job, directly terminates the compute instance if stack cleanup does not finish it, and marks the Firebase record terminated.
+
+To confirm disabled-region cleanup, set a region entry to `enabled: false` while leaving its account config intact. Deploy should reject that region, but admin termination for an existing target in that region should still run.
 
 ## References
 
