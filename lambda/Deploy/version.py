@@ -1,4 +1,4 @@
 """CloudLaunch Lambda package version."""
 
-__version__ = "0.0.20"
+__version__ = "0.0.21"
 VERSION = __version__
