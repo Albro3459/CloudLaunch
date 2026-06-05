@@ -134,6 +134,34 @@ def get_user_instances_in_region(user_id, role, region):
         return region_instances if region_instances else None
 
 
+def get_active_instance_count_for_region(region):
+    try:
+        db = firestore.client()
+        users_ref = db.collection("Users")
+        count = 0
+
+        for user_doc in users_ref.stream():
+            instances_ref = (
+                users_ref
+                .document(user_doc.id)
+                .collection("Regions")
+                .document(region)
+                .collection("Instances")
+            )
+
+            for instance_doc in instances_ref.stream():
+                instance = instance_doc.to_dict() or {}
+                status = normalize_vpn_status(instance.get("status"))
+                if status and status.value in ACTIVE_VPN_STATUSES:
+                    count += 1
+
+        return count
+    except Exception as e:
+        error_message = f"Error counting active instances for region {region}: {e}"
+        print(error_message)
+        raise RuntimeError(error_message) from e
+
+
 def get_instance(uid, region, instance_id):
     try:
         _, instance_ref = _get_instance_ref(uid, region, instance_id)

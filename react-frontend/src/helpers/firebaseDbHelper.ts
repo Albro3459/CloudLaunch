@@ -5,8 +5,10 @@ import { NavigateFunction } from "react-router-dom";
 
 import { getUserRole } from "./usersHelper";
 import { normalizeVPNStatus, VPN_STATUS, VPNStatus } from "./vpnStatus";
+import { useOciRegionsStore } from "../stores/ociRegionsStore";
 
 export const logout = async (navigate: NavigateFunction) => {
+    useOciRegionsStore.getState().clearOciRegions();
     await signOut(auth);
     navigate("/", { replace: true });
 };

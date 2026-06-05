@@ -34,7 +34,7 @@ export const SecureGetRegionsHelper = async (token: string) => {
         myHeaders.append("Authorization", `Bearer ${token}`);
         myHeaders.append("Content-Type", "application/json");
 
-        const raw = JSON.stringify({ "requested": "region" });
+        const raw = JSON.stringify({ "requested": "regions" });
 
         const requestOptions: RequestInit = {
             method: "POST",
@@ -49,7 +49,8 @@ export const SecureGetRegionsHelper = async (token: string) => {
         if (!response.ok) {
             return {
                 success: false,
-                error: getApiErrorMessage(result, response.status)
+                error: getApiErrorMessage(result, response.status),
+                data: result
             };
         }
 
@@ -93,7 +94,8 @@ export const SecureGetWireguardConfigHelper = async (public_ipv4: string, token:
         if (!response.ok) {
             return {
                 success: false,
-                error: getApiErrorMessage(result, response.status)
+                error: getApiErrorMessage(result, response.status),
+                data: result
             };
         }
 
@@ -123,7 +125,7 @@ export enum ACTION {
     TERMINATE = "terminate"
 }
 
-export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, email: string | null, target_region: string | null, token: string, overrideExistingVpn = false) => {
+export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, email: string | null, region: string | null, token: string, overrideExistingVpn = false) => {
     try {
         const myHeaders = new Headers();
         myHeaders.append("Authorization", `Bearer ${token}`);
@@ -133,7 +135,7 @@ export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, e
             "action": action,
             "targets": targets,
             "email" : email,
-            "target_region": target_region,
+            "region": region,
             "override_existing_vpn": overrideExistingVpn,
         });
 
@@ -150,7 +152,8 @@ export const VPNdeployHelper = async (action: ACTION, targets: Targets | null, e
         if (!response.ok) {
             return {
                 success: false,
-                error: getApiErrorMessage(result, response.status)
+                error: getApiErrorMessage(result, response.status),
+                data: result
             };
         }
 

@@ -1,19 +1,25 @@
 import json
 
 from config_helper import get_config, get_wireguard_config_options
-from firebase import initialize_firebase, verify_firebase_token, get_user_role
+from firebase import (
+    get_active_instance_count_for_region,
+    initialize_firebase,
+    verify_firebase_token,
+    get_user_role,
+)
 from get_secrets import (
     CloudflareSecretKey,
     OciSecretKey,
     SecretSection,
     VpnSecretKey,
     get_cloudlaunch_secret,
+    get_oci_regions,
     get_secret_section,
     get_secret_value,
 )
 
 AWS_REGION = "us-west-1"
-VALID_REQUESTS = {"region", "config"}
+VALID_REQUESTS = {"regions", "config"}
 WORKER_SECRET_HEADER = "x-cloudlaunch-worker-secret"
 
 
@@ -28,6 +34,35 @@ def _get_header(headers, name, default=""):
 def _worker_secret_is_valid(headers, expected_secret):
     provided_secret = _get_header(headers, WORKER_SECRET_HEADER, "")
     return bool(expected_secret) and provided_secret == expected_secret
+
+
+def _build_public_region_list(oci_root_config):
+    public_regions = []
+    regions = get_oci_regions(oci_root_config)
+
+    for region, region_config in regions.items():
+        if region_config.get("enabled") is False:
+            continue
+
+        region_name = get_secret_value(region_config, OciSecretKey.REGION_NAME)
+        try:
+            region_limit = int(region_config.get("region_limit"))
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid region_limit for {region}")
+
+        active_count = get_active_instance_count_for_region(region)
+        public_regions.append({
+            "oci_region": region,
+            "oci_region_name": region_name,
+            "enabled": True,
+            "capacity": {
+                "limit": region_limit,
+                "active": active_count,
+                "available": max(region_limit - active_count, 0),
+            },
+        })
+
+    return public_regions
 
 def lambda_handler(event, context):
     """
@@ -79,7 +114,7 @@ def lambda_handler(event, context):
 
     try:
         firebaseSecrets = get_secret_section(cloudlaunch_secret, SecretSection.FIREBASE)
-        oci_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
+        oci_root_config = get_secret_section(cloudlaunch_secret, SecretSection.OCI)
         vpn_config = get_secret_section(cloudlaunch_secret, SecretSection.VPN)
     except ValueError as e:
         return {
@@ -97,12 +132,9 @@ def lambda_handler(event, context):
         return {"statusCode": 403, "body": json.dumps({"error": "No user role found"})}
 
     try:
-        if requested == "region":
+        if requested == "regions":
             result = {
-                "region": {
-                    "oci_region": get_secret_value(oci_config, OciSecretKey.REGION),
-                    "oci_region_name": get_secret_value(oci_config, OciSecretKey.REGION_NAME),
-                }
+                "regions": _build_public_region_list(oci_root_config)
             }
         else:
             if not isinstance(ip_addresses, dict):
@@ -133,6 +165,11 @@ def lambda_handler(event, context):
                 ),
             }
     except ValueError as e:
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": str(e)})
+        }
+    except RuntimeError as e:
         return {
             "statusCode": 500,
             "body": json.dumps({"error": str(e)})

@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 
 import { ACTION, Targets, VPNdeployHelper } from "../helpers/APIHelper";
 import { auth, onAuthStateChanged } from "../firebase";
-import { getRegionName } from "../helpers/regionsHelper";
+import { getRegionCapacityLabel, getRegionName, isRegionAtCapacity } from "../helpers/regionsHelper";
 import { getUserRole } from "../helpers/usersHelper";
 
 import { VPNTable, VPNTableEntry } from "../components/VPNTable";
@@ -28,9 +28,11 @@ const Home: React.FC = () => {
     const [role, setRole] = useState<string | null>(null);
     const [jwtToken, setJwtToken] = useState<string | null>(null);
 
-    const { ociRegions } = useOciRegionsStore();
+    const { ociRegions, loading: regionsLoading, error: regionsError } = useOciRegionsStore();
 
     const [region, setRegion] = useState("");
+    const selectedRegion = ociRegions?.find(r => r.value === region) || null;
+    const selectedRegionFull = isRegionAtCapacity(selectedRegion);
 
     const [VPNTableEntries, setVPNTableEntries] = useState<VPNTableEntry[] | null>(null);
     const [vpnRegion, setVpnRegion] = useState<string | null>(null);
@@ -75,11 +77,23 @@ const Home: React.FC = () => {
                 setErrorMessage("Error: JWT token not found");
                 console.error("Error: JWT token not found");
             }
+            else if (!region) {
+                setErrorMessage("Select a region");
+            }
+            else if (selectedRegionFull) {
+                setErrorMessage(`${getRegionName(region, ociRegions)} is currently full. Choose another region.`);
+            }
             else {
                 const response = await VPNdeployHelper(ACTION.DEPLOY, null, auth.currentUser?.email || "", region, jwtToken, overrideExistingVpn);
 
                 if (!response.success) {
-                    setErrorMessage(response.error || "Something went wrong");
+                    const responseData = response.data;
+                    if (responseData?.error === "Region capacity reached" && typeof responseData.region === "string") {
+                        setErrorMessage(`${getRegionName(responseData.region, ociRegions)} is currently full. Choose another region.`);
+                        await fetchOciRegions(jwtToken, true);
+                    } else {
+                        setErrorMessage(response.error || "Something went wrong");
+                    }
                     if (auth.currentUser) {
                         await fillVPNs(auth.currentUser);
                     }
@@ -91,6 +105,8 @@ const Home: React.FC = () => {
                 const publicIPv4 = ip_addresses?.public_ipv4 || "";
                 const ociRegion = deployRegion?.oci_region || region;
                 const ociRegionName = deployRegion?.oci_region_name || getRegionName(ociRegion, ociRegions);
+
+                void fetchOciRegions(jwtToken, true);
 
                 navigate("/vpn-success", {
                     replace: true,
@@ -120,6 +136,14 @@ const Home: React.FC = () => {
 
         if (VPNTableEntries === null) {
             setErrorMessage("VPN instances are still loading");
+            return;
+        }
+        if (!region) {
+            setErrorMessage("Select a region");
+            return;
+        }
+        if (selectedRegionFull) {
+            setErrorMessage(`${getRegionName(region, ociRegions)} is currently full. Choose another region.`);
             return;
         }
 
@@ -213,7 +237,10 @@ const Home: React.FC = () => {
                 setTargets({});
 
                 if (auth.currentUser) {
-                    await fillVPNs(auth.currentUser);
+                    await Promise.all([
+                        fillVPNs(auth.currentUser),
+                        fetchOciRegions(jwtToken, true),
+                    ]);
                 }
             }
 
@@ -285,7 +312,7 @@ const Home: React.FC = () => {
                     
                     setRole(await getUserRole(user));
                     
-                    void fetchOciRegions(token); // Not awaiting
+                    void fetchOciRegions(token, true); // Not awaiting
                 } else {
                     await logout(navigate);
                 }
@@ -296,10 +323,12 @@ const Home: React.FC = () => {
     }, [navigate, fillVPNs]);
 
     useEffect(() => {
-        if (!region && ociRegions?.length) {
-            setRegion(ociRegions[0].value);
+        if (region && ociRegions?.length && !ociRegions.some(r => r.value === region)) {
+            setRegion("");
         }
     }, [ociRegions, region]);
+
+    const regionSubmitDisabled = !region || !selectedRegion || selectedRegionFull || regionsLoading || VPNTableEntries === null;
 
     return (
         // <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
@@ -355,10 +384,41 @@ const Home: React.FC = () => {
                 <form onSubmit={async (e) => { await handleDeploySubmit(e); }}>
                 {/* Region Display */}
                 <div className="mb-6">
-                    <p className="block text-gray-700 font-medium mb-2">Region</p>
-                    <div className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800">
-                        {getRegionName(region, ociRegions) || "Loading region"}
-                    </div>
+                    <label htmlFor="region" className="block text-gray-700 font-medium mb-2">Region</label>
+                    <select
+                        id="region"
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value)}
+                        disabled={regionsLoading || !ociRegions?.length}
+                        className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800"
+                    >
+                        <option value="" disabled>
+                            {regionsLoading ? "Loading regions" : "Select a region"}
+                        </option>
+                        {ociRegions?.map(ociRegion => {
+                            const capacityLabel = getRegionCapacityLabel(ociRegion);
+                            const disabled = ociRegion.enabled === false || isRegionAtCapacity(ociRegion);
+                            return (
+                                <option
+                                    key={ociRegion.value}
+                                    value={ociRegion.value}
+                                    disabled={disabled}
+                                >
+                                    {capacityLabel ? `${ociRegion.name} (${capacityLabel})` : ociRegion.name}
+                                </option>
+                            );
+                        })}
+                    </select>
+                    {selectedRegion?.capacity && (
+                        <p className={`ps-2 mt-2 text-xs ${selectedRegionFull ? "text-red-600" : "text-gray-500"}`}>
+                            {selectedRegionFull
+                                ? `${selectedRegion.name} is currently full. Choose another region.`
+                                : getRegionCapacityLabel(selectedRegion)}
+                        </p>
+                    )}
+                    {regionsError && (
+                        <p className="ps-2 mt-2 text-xs text-red-600">{regionsError}</p>
+                    )}
                     {role && role !== "admin" &&
                         <div className="ps-2 mt-2 text-xs">
                             <a
@@ -373,9 +433,9 @@ const Home: React.FC = () => {
                 {/* Submit Button */}
                 <button
                     type="submit"
-                    disabled={!region || VPNTableEntries === null}
+                    disabled={regionSubmitDisabled}
                     className={`w-full p-3 rounded-lg transition ${
-                    region && VPNTableEntries !== null
+                    !regionSubmitDisabled
                         ? "cursor-pointer bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-gray-400 text-gray-200 cursor-not-allowed"
                     }`}

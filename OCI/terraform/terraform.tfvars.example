@@ -1,3 +1,8 @@
+# Manual stack testing only.
+# Runtime CloudLaunch deploys do not read terraform.tfvars. The Deploy Lambda
+# sends these values from the selected CloudLaunch.oci.regions.<region> entry in
+# AWS Secrets Manager.
+
 availability_domain     = "xJLJ:US-SANJOSE-1-AD-1"
 region                  = "us-sanjose-1"
 compartment_id          = "ocid1.tenancy.oc1...replace_me"

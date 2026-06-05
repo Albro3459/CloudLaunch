@@ -75,7 +75,7 @@ def lambda_handler(event, context):
     if not cloudlaunch_secret:
         return {
             "statusCode": 500,
-            "body": json.dumps({"error": "Failed retrieving secrets from AWS"})
+            "body": json.dumps({"error": "Failed to retrieve secrets from AWS"})
         }
 
     try:
