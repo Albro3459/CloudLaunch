@@ -32,6 +32,16 @@ class OciSecretKey(StrEnum):
     REGION = "OCI_REGION"
     REGION_NAME = "OCI_REGION_NAME"
 
+OCI_SHARED_SECRET_KEYS = {
+    "OCI_SSH_AUTHORIZED_KEYS_JSON",
+    "OCI_HASHED_PASSWORD",
+    "OCI_INSTANCE_SHAPE",
+    "OCI_INSTANCE_MEMORY_GBS",
+    "OCI_INSTANCE_OCPUS",
+    "OCI_BOOT_VOLUME_SIZE_GBS",
+    "OCI_BOOT_VOLUME_VPUS_PER_GB",
+}
+
 # Get secrets from AWS
 def get_secret(secret_name, region_name):
     session = boto3.session.Session()
@@ -62,7 +72,26 @@ def get_secret_section(secret_values: dict, section: SecretSection):
         return value
     raise ValueError(f"Missing required secret section: {section.value}")
 
+def validate_oci_shared_config(oci_section: dict):
+    shared_config = (oci_section or {}).get("shared")
+    if not isinstance(shared_config, dict):
+        raise ValueError("Missing required secret value: oci.shared")
+
+    invalid_keys = sorted(
+        key
+        for key in shared_config
+        if key not in OCI_SHARED_SECRET_KEYS
+    )
+    if invalid_keys:
+        raise ValueError(f"Invalid OCI shared secret keys: {', '.join(invalid_keys)}")
+
+    missing_keys = sorted(OCI_SHARED_SECRET_KEYS - set(shared_config))
+    if missing_keys:
+        raise ValueError(f"Missing required OCI shared secret keys: {', '.join(missing_keys)}")
+
 def get_oci_regions(oci_section: dict) -> dict:
+    validate_oci_shared_config(oci_section)
+
     regions = (oci_section or {}).get("regions")
     if not isinstance(regions, dict) or not regions:
         raise ValueError("Missing required secret value: oci.regions")

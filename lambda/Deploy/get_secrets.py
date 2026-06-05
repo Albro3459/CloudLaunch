@@ -40,6 +40,16 @@ class OciSecretKey(StrEnum):
     BOOT_VOLUME_VPUS_PER_GB = "OCI_BOOT_VOLUME_VPUS_PER_GB"
     IPV6_SUBNET_CIDR = "OCI_IPV6_SUBNET_CIDR"
 
+OCI_SHARED_SECRET_KEYS = {
+    OciSecretKey.SSH_AUTHORIZED_KEYS_JSON.value,
+    OciSecretKey.HASHED_PASSWORD.value,
+    OciSecretKey.INSTANCE_SHAPE.value,
+    OciSecretKey.INSTANCE_MEMORY_GBS.value,
+    OciSecretKey.INSTANCE_OCPUS.value,
+    OciSecretKey.BOOT_VOLUME_SIZE_GBS.value,
+    OciSecretKey.BOOT_VOLUME_VPUS_PER_GB.value,
+}
+
 class VpnSecretKey(StrEnum):
     INTERFACE = "WG_INTERFACE"
     LISTEN_PORT = "WG_LISTEN_PORT"
@@ -94,6 +104,8 @@ def get_secret_section(secret_values: dict, section: SecretSection):
     raise ValueError(f"Missing required secret section: {section.value}")
 
 def get_oci_regions(oci_section: dict) -> dict:
+    get_oci_shared_config(oci_section)
+
     regions = (oci_section or {}).get("regions")
     if not isinstance(regions, dict) or not regions:
         raise ValueError("Missing required secret value: oci.regions")
@@ -113,12 +125,32 @@ def get_oci_regions(oci_section: dict) -> dict:
 
     return regions
 
+def get_oci_shared_config(oci_section: dict) -> dict:
+    shared_config = (oci_section or {}).get("shared")
+    if not isinstance(shared_config, dict):
+        raise ValueError("Missing required secret value: oci.shared")
+
+    invalid_keys = sorted(
+        key
+        for key in shared_config
+        if key not in OCI_SHARED_SECRET_KEYS
+    )
+    if invalid_keys:
+        raise ValueError(f"Invalid OCI shared secret keys: {', '.join(invalid_keys)}")
+
+    missing_keys = sorted(OCI_SHARED_SECRET_KEYS - set(shared_config))
+    if missing_keys:
+        raise ValueError(f"Missing required OCI shared secret keys: {', '.join(missing_keys)}")
+
+    return shared_config
+
 def get_oci_region_config(oci_section: dict, region: str, allow_disabled=False) -> dict:
     requested_region = (region or "").strip()
     if not requested_region:
         raise ValueError("Missing required region")
 
     regions = get_oci_regions(oci_section)
+    shared_config = get_oci_shared_config(oci_section)
     region_config = regions.get(requested_region)
     if not isinstance(region_config, dict) or not region_config:
         raise ValueError(f"Unsupported OCI region: {requested_region}")
@@ -126,7 +158,11 @@ def get_oci_region_config(oci_section: dict, region: str, allow_disabled=False) 
     if region_config.get("enabled") is False and not allow_disabled:
         raise ValueError(f"OCI region is disabled: {requested_region}")
 
-    return region_config
+    # Overwrites any duplicated keys in `region_config` that are also in `shared_config`
+    return {
+        **region_config,
+        **shared_config,
+    }
 
 def get_secret_value(secret_values: dict, key: StrEnum):
     value = (secret_values or {}).get(key.value)

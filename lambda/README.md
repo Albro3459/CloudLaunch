@@ -13,16 +13,27 @@ The secret has five top-level objects:
 * `oci`
 * `vpn`
 
-Keep AWS SES email values in `aws`, the Cloudflare worker shared secret in `cloudflare`, the complete Firebase service-account JSON in `firebase`, OCI account and Terraform runtime values in `oci.regions.<region>`, and WireGuard runtime values in `vpn`.
+Keep AWS SES email values in `aws`, the Cloudflare worker shared secret in `cloudflare`, the complete Firebase service-account JSON in `firebase`, shared OCI runtime defaults in `oci.shared`, per-region OCI account and network values in `oci.regions.<region>`, and WireGuard runtime values in `vpn`.
 
 `oci.regions` is a map keyed by the OCI region code, such as `us-sanjose-1` or `us-ashburn-1`. One region entry represents one OCI account or tenancy configuration.
+
+`oci.shared` values that are identical across regions:
+* `OCI_SSH_AUTHORIZED_KEYS_JSON`
+* `OCI_HASHED_PASSWORD`
+* `OCI_INSTANCE_SHAPE`
+* `OCI_INSTANCE_MEMORY_GBS`
+* `OCI_INSTANCE_OCPUS`
+* `OCI_BOOT_VOLUME_SIZE_GBS`
+* `OCI_BOOT_VOLUME_VPUS_PER_GB`
 
 Each region entry should include:
 * `enabled`: `true` to allow new deploys, `false` to hide the region from SecureGet and reject new deploys.
 * `region_limit`: app-level maximum active VPNs for that region. This cap applies to admins too.
 * `OCI_REGION_NAME`: display name returned to the frontend.
 * OCI API signing values: user OCID, tenancy OCID, fingerprint, and private key.
-* Terraform runtime values: compartment, availability domain, subnet, source image, shape, boot volume, SSH keys, password hash, and IPv6 subnet CIDR.
+* Per-region Terraform runtime values: compartment, availability domain, subnet, source image, and IPv6 subnet CIDR.
+
+If a region entry still includes one of these shared keys, Deploy ignores that region value and uses `oci.shared`.
 
 Keep disabled region configs in the secret until all existing VPNs in that region are terminated. Admin termination can still use a disabled region's stored account config for cleanup.
 
@@ -49,7 +60,7 @@ Deploy requests must include a `region` field. There is no default region.
 
 For deploy actions, the `Deploy` Lambda:
 
-1. Reads `CloudLaunch.oci.regions.<region>`.
+1. Reads `CloudLaunch.oci.shared` and `CloudLaunch.oci.regions.<region>`, then merges them.
 2. Rejects missing, unsupported, or disabled regions.
 3. Verifies the Firebase token and reads the user's role.
 4. Checks for an existing active VPN for that user in the selected region.
