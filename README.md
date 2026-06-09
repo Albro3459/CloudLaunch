@@ -1,3 +1,6 @@
+# **IMPORTANT**
+The full Oracle Cloud migration project was moved to [CloudGateway](https://github.com/Albro3459/CloudGateway)!
+
 # CloudLaunch:
 
 <div style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 80px;">
