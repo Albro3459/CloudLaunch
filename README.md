@@ -1,69 +1,53 @@
-# CloudLaunch:
+# CloudLaunch
 
-<div style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 80px;">
-   <img src="https://github.com/user-attachments/assets/e30a1af1-057b-4209-abbe-99cb62da9d5c" alt="Dashboard" height="400"/>
-   <img src="https://github.com/user-attachments/assets/2665ae69-5ab6-4d1d-ab18-f1cd32935ae8" alt="Deploy" height="400"/>
-</div>
+CloudLaunch is a multi-region automated cloud deployment platform. It is built around two platform actions:
 
-## About:
+* **Region setup and cleanup**: prepares an AWS region so servers can be launched there, then removes that regional infrastructure when it is no longer needed. In this project, this flow is called "terraforming" a region, as reference to "terraforming" a planet.
+* **Server deploy and terminate**: deploys a server into any region that has already been set up, then terminates that server when it is no longer needed.
 
- * Live at: [gocloudlaunch.com](https://gocloudlaunch.com/)
+The included example implementation is a WireGuard VPN product. After a region has been set up, the UI can deploy a VPN server into that region, return the client configuration, and terminate the server later. Termination and region cleanup are designed so an unused region can return to zero cloud cost.
 
- * Instantly deploy a secure <b>WireGuard VPN</b> on an AWS EC2 instance in the region of your choice, pre-configured with IPv4, IPv6, and DNS.
+## Platform Flow
 
- * The entire deployment process is automated using <b>AWS Lambda</b>, ensuring a fast, efficient, and hassle-free setup.
+1. An admin selects an AWS region to set up.
+2. AWS Lambda copies the base EC2 AMI into that region.
+3. The setup Lambda creates the regional network and runtime configuration: VPC, subnet, internet gateway, route table, security group, key pair, and Secrets Manager values.
+4. A waiter Lambda confirms that the AMI is available and marks the region as live.
+5. Users can deploy servers into any live region.
+6. Cleanup can terminate servers and remove the regional resources created during setup.
 
- * Generate your VPN configuration instantly, scan a QR code, or download the <b>.conf</b> file for easy setup on your devices. All in just a few clicks.
+## Example VPN Flow
 
- * <b>Secure, simple, and instant.</b> Your personal cloud VPN, deployed on demand.
- 
-## Languages and Frameworks:
-* React with TypeScript and TailwindCSS for the Frontend
-* Python for the AWS Lambda scripts
-* Firebase for Authentication and Database
-* AWS tools used:
-  * EC2 (+ AMI), Lambda, SES, DynamoDB, Secrets Manager, VPC (+ Subnet), IAM, CloudWatch, and the AWS CLI
-* EC2 instance configured with Wireguard, then saved as an AMI image that can be automatically deployed to any region from the frontend with Lambda scripts.
-* If you would like documentation on how to configure a Wireguard EC2 VPN yourself, email me: [brodsky.alex22@gmail.com](brodsky.alex22@gmail.com)
+1. A user signs in through the React frontend with Firebase Authentication.
+2. The frontend calls AWS Lambda endpoints to discover live regions, deploy a VPN, retrieve VPN config values, or request termination.
+3. The Deploy Lambda launches an EC2 instance from the prepared AMI in the selected region.
+4. The app records instance state in Firebase and enforces VPN limits with DynamoDB.
+5. SES emails the WireGuard client configuration, and the UI can also show or download the config.
+6. Termination stops the VPN server and updates stored state so the instance no longer costs money.
 
-## Usage
+## Services Used
 
-* Only the admin account is active for the time being.
+### Main Platform
 
-* [Email me](mailto:brodsky.alex22@gmail.com) or message me on [LinkedIn](https://www.linkedin.com/in/brodsky-alex22/) if you want to try it.
+* **AWS Lambda**: runs the setup, cleanup, deploy, terminate, region discovery, and user helper APIs.
+* **Amazon EC2**: hosts deployed servers and provides AMIs for repeatable regional deployment.
+* **Amazon Machine Images (AMIs)**: store the preconfigured server image copied into target regions.
+* **Amazon VPC**: creates isolated regional networking for deployed servers.
+* **Subnets, internet gateways, route tables, and security groups**: provide public IPv4/IPv6 routing and firewall rules for each prepared region.
+* **AWS Secrets Manager**: stores credentials and per-region server deployment values.
+* **AWS IAM**: grants Lambda the permissions required by the platform and the example implementation.
+* **Amazon CloudWatch Logs**: captures Lambda runtime logs and deployment diagnostics.
 
-* To save the config file or scan the QR code, on either the phone or computer, you need the Wireguard app because the VPN uses the Wireguard protocol.
-  * Desktop: [wireguard.com](https://www.wireguard.com/install/) or for iPhone: [AppStore](https://apps.apple.com/us/app/wireguard/id1441195209)
+### Example VPN Implementation
 
-#### On Phone
+* **React, TypeScript, and Tailwind CSS**: provide the example frontend UI.
+* **Firebase Authentication**: handles user sign-in.
+* **Firebase Firestore**: stores user and VPN instance state used by the UI and Lambdas.
+* **Amazon DynamoDB**: tracks VPN user counts and role-based limits for the example product.
+* **Amazon SES**: sends WireGuard client configuration emails.
+* **WireGuard**: provides the VPN server and client protocol.
 
-* Demo in the YouTube video.
+## Documentation
 
-* Install the Wireguard app on your phone.
-
-* Either download the config file or scan the QR code in the Wireguard app.
-
-* Enable it in Wireguard and Settings and you're done!
-
-#### On Mac
-
-* It's much easier to use the Wireguard Desktop app, but you can follow these steps instead:
-
-* Start WireGuard manually:
-  ```sh
-  wg-quick up wg-client
-  ```
-
-* Check status:
-  ```sh
-  sudo wg
-  ```
-
-* To stop it:
-  ```sh
-  wg-quick down wg-client
-  ```
-
-### Running the React Site:
-
-* See react-frontend folder for React README
+* [AWS Lambda functions README](./lambda/README.md)
+* [React frontend README](./react-frontend/README.md)

@@ -1,35 +1,47 @@
-### Running React Site:
+# React Frontend
 
-Update dependencies:
+This is the example CloudLaunch UI. It lets authenticated users interact with the AWS Lambda APIs for region setup, region cleanup, VPN deployment, VPN termination, and WireGuard config access.
+
+The frontend uses React, TypeScript, Tailwind CSS, Firebase Authentication, and Firebase/Firestore data used by the example VPN implementation.
+
+## Local Setup
+
+Install dependencies:
+
 ```sh
-cd CloudLaunch; 
+cd react-frontend
 npm install
 ```
 
-Run project on local:
-```sh
-cd react-frontend; 
-npm start
-````
+Configure the frontend secrets from the examples in `src/Secrets/`:
 
-Keep tailwind css updated while making changes:
+* Firebase web app config
+* Lambda endpoint URLs
+* Source AWS region value
+
+## Run Locally
+
 ```sh
-cd react-frontend; 
-npx @tailwindcss/cli -i ./src/input.css -o ./src/output.css --watch
+cd react-frontend
+npm start
 ```
 
----
+The `start` script runs the React dev server and watches Tailwind output.
 
-### Deploy GitHub page:
+## Build
 
-* NOTE: This uses the your local build code to deploy. It does NOT pull from any remote branch. It compiles your code to the build folder and deploys that. 
-    * Pro: Can be ran from any branch
-    * Con: Must be run locally and it can be confusing
-
-Push changes to main or dev.
-
-Then:
 ```sh
-cd react-frontend; 
-npm run deploy # Deploys to gh-pages branch
-````
+cd react-frontend
+npm run build
+```
+
+## Deploy GitHub Page
+
+The deploy command uses your local build output. It does not pull from any remote branch.
+
+```sh
+cd react-frontend
+npm run deploy
+```
+
+This publishes the local `build/` folder to the `gh-pages` branch.
