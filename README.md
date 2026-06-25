@@ -7,6 +7,10 @@ CloudLaunch is a multi-region automated cloud deployment platform. It is built a
 
 The included example implementation is a WireGuard VPN product. After a region has been set up, the UI can deploy a VPN server into that region, return the client configuration, and terminate the server later. Termination and region cleanup are designed so an unused region can return to zero cloud cost.
 
+## Built With CloudLaunch
+
+[CloudGateway](https://github.com/Albro3459/CloudGateway) is a full production project adapted from this platform. It takes the example WireGuard VPN implementation and builds it into a hosted, multi-region WireGuard VPN service using React/TypeScript, FastAPI/Python, Firebase Auth/Firestore, and Oracle Cloud Infrastructure, all on top of CloudLaunch's multi-region deployment architecture.
+
 ## Platform Flow
 
 1. An admin selects an AWS region to set up.
